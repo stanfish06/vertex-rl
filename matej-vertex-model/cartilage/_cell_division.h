@@ -201,7 +201,7 @@ int DIVIDE_CELL(int i, float separ, int subdomain)
 
 void growth_division(){
     float nrSUSC=0;
-#pragma omp parallel for num_threads(num_threads_count) reduction(+: nrSUSC) 
+//#pragma omp parallel for num_threads(num_threads_count) reduction(+: nrSUSC) 
     //for(int i=1; i<=Nc; i++) if(exist[3][i]==1) if(get_subdomain(i) == 1 && c_area[i] > CV[get_subdomain(i)]) {
     //    nrSUSC++;
     //}
