@@ -227,7 +227,7 @@ void set_initial_singleCell(){
     float height = max_y; 
     // number of random samples
     srand(646);
-    int nrC_try =300;
+    int nrC_try =100;
     int nrC_per_row = int(width);
     int nrC_per_col = int(height);
     //V,E,P,C

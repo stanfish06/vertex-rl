@@ -150,9 +150,30 @@ void parseAndSet(const std::string &input) {
 	else if (parameter  == "lthUP") lthUP = value;
 	else if (parameter  == "lthDOWN") lthDOWN = value;
 	else if (parameter  == "lALERT") lALERT = value;
-	else if (parameter  == "max_num_edges") max_num_edges = value;
-	else if (parameter  == "min_division_n_edges") min_division_n_edges = value;
-	else if (parameter  == "min_exist_n_edges") min_exist_n_edges = value;
+	else if (parameter  == "max_num_edges") max_num_edges = int(value);
+	else if (parameter  == "min_division_n_edges") min_division_n_edges = int(value);
+	else if (parameter  == "min_exist_n_edges") min_exist_n_edges = int(value);
+	else if (parameter  == "number_of_threads") {
+	    int n = int(value);
+	    num_threads_count = n;
+	    num_threads_division = n;
+	    num_threads_edge_manipulation = n;
+	    num_threads_force = n;
+	    num_threads_calculation = n;
+	    num_threads_update = n; 
+	}
+	else if (parameter  == "resting_CV") {CV[0] = value; CORE[0] = sqrt(value);}
+	else if (parameter  == "proliferative_CV") {CV[1] = value; CORE[1] = sqrt(value);}
+	else if (parameter  == "hypertrophic_CV") {CV[2] = value; CORE[2] = sqrt(value);}
+	else if (parameter  == "ossification_CV") {CV[3] = value; CORE[3] = sqrt(value);}
+	else if (parameter  == "resting_ECM") ECM[0] = value;
+	else if (parameter  == "proliferative_ECM") ECM[1] = value;
+	else if (parameter  == "hypertrophic_ECM") ECM[2] = value;
+	else if (parameter  == "ossification_ECM") ECM[3] = value;
+	else if (parameter  == "resting_T") EG[0] = value;
+	else if (parameter  == "proliferative_T") EG[1] = value;
+	else if (parameter  == "hypertrophic_T") EG[2] = value;
+	else if (parameter  == "ossification_T") EG[3] = value;
 	else  std::cout << "Unknown parameter: " << parameter << std::endl;	
 	std::cout << std::endl;
 	return;
@@ -162,22 +183,35 @@ void parseAndSet(const std::string &input) {
 
 void parameter_list() {        
 printf(
-    " Name                           Description                     Current value   \n"
-    "  1. k0                         Description of parameter 1      %f              \n"
-    "  2. kS                         Description of parameter 2      %f              \n"
-    "  3. lS                         Description of parameter 3      %f              \n"
-    "  4. kA                         Description of parameter 4      %f              \n"
-    "  5. e_g0                       Description of parameter 5      %f              \n"
-    "  6. tMAX                       Description of parameter 6      %f              \n"
-    "  7. outFreq                    D                               %f              \n"
-    "  8. maxDR                      D                               %f              \n"
-    "  9. lthUP                      D                               %f              \n"
-    " 10. lthDOWN                    D                               %f              \n"
-    " 11. lALERT                     D                               %f              \n"
-    " 12. max_num_edges              D                               %d              \n"
-    " 13. min_division_n_edges       D                               %d              \n"
-    " 14. min_exist_n_edges          D                               %d              \n",
-    k0, kS, lS, kA, e_g0, tMAX, outFreq, maxDR, lthUP, lthDOWN, lALERT, max_num_edges, min_division_n_edges, min_exist_n_edges
+    " Name                           Description                                Current value   \n"
+    "  1. k0                         Cell-cell repulsion                        %.3g            \n"
+    "  2. kS                         Cell-ECM repulsion                         %.3g            \n"
+    "  3. lS                         ECM width                                  %.3g            \n"
+    "  4. kA                         Area elasticity                            %.3g            \n"
+    "  5. e_g0                       Line tension                               %.3g            \n"
+    "  6. tMAX                       Final simulation time                      %.3g            \n"
+    "  7. outFreq                    Output time interval                       %.3g            \n"
+    "  8. maxDR                      Maximum displacement per step              %.3g            \n"
+    "  9. lthUP                      Upper edge length bound                    %.3g            \n"
+    " 10. lthDOWN                    Lower edge length bound                    %.3g            \n"
+    " 11. lALERT                     Cell-cell repulsion width                  %.3g            \n"
+    " 12. max_num_edges              Upper edge number bound                    %d              \n"
+    " 13. min_division_n_edges       Lower edge number bound at division        %d              \n"
+    " 14. min_exist_n_edges          Lower edge number bound normally           %d              \n"
+    " 15. number_of_threads          Program parallelism                        %d		\n"
+    " 16. resting_CV                 Resting zone cell volume                   %.3g 		\n"
+    " 17. proliferative_CV           Proliferative zone cell volume             %.3g 		\n"
+    " 18. hypertrophic_CV            Hypertrophic zone cell volume              %.3g 		\n"
+    " 19. ossification_CV            Ossification zone cell volume              %.3g 		\n"
+    " 20. resting_ECM                Resting zone ECM scaling                   %.3g 		\n"
+    " 21. proliferative_ECM          Proliferative zone ECM scaling             %.3g 		\n"
+    " 22. hypertrophic_ECM           Hypertrophic zone ECM scaling              %.3g 		\n"
+    " 23. ossification_ECM           Ossification zone ECM scaling              %.3g 		\n"
+    " 24. resting_T                  Resting zone line tension scaling          %.3g 		\n"
+    " 25. proliferative_T            Proliferative zone line tension scaling    %.3g 		\n"
+    " 26. hypertrophic_T             Hypertrophic zone line tension scaling     %.3g 		\n"
+    " 27. ossification_T             Ossification zone line tension scaling     %.3g 		\n",
+    k0, kS, lS, kA, e_g0, tMAX, outFreq, maxDR, lthUP, lthDOWN, lALERT, max_num_edges, min_division_n_edges, min_exist_n_edges, num_threads_force, CV[0], CV[1], CV[2], CV[3], ECM[0], ECM[1], ECM[2], ECM[3], EG[0], EG[1], EG[2], EG[3] 
 );
 }
 
@@ -214,7 +248,8 @@ void interface_setting() {
 
 //********************MAIN********************************
 int main(int argc, char *argv[]){
-    const char* helpManual = R"(
+
+const char* helpManual = R"(
 Usage: 2D vertex model for cartilage simulation
 
 Commands:
@@ -229,27 +264,14 @@ Commands:
 
 Examples:
 )";
-const char* parameterManual = R"(
-  Name                          Description			Current value
-  1. k0          		Description of parameter 1	
-  2. kS         		Description of parameter 2
-  3. lS  			Description of parameter 3
-  4. kA  			Description of parameter 4 
-  5. e_g0          		Description of parameter 5
-  6. tMAX                       Description of parameter 5
-  7. outFreq                    D
-  8. maxDR			D
-  9. lthUP			D
- 10. lthDOWN			D
- 11. lALERT			D
- 12. max_num_edges		D
- 13. min_division_n_edges	D
- 14. min_exist_n_edges		D
-)";
-    printf("Press Ctrl+c or enter exit to quit\n");
+
+    printf("Press Ctrl+c or enter exit to quit. Enter help to get started.\n");
     char* buf;
     while ((buf = readline(">> ")) != nullptr) {
 	std::string buf_str = buf;
+	if (strlen(buf) > 0) {
+            add_history(buf);
+        }
         if (strcmp(buf, "help") == 0) {
 	    std::cout << helpManual << std::endl;
 	} else if (strcmp(buf, "exit") == 0) {
