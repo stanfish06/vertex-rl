@@ -128,6 +128,12 @@ int min_exist_n_edges = 6;
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <thread>
+#include <chrono>
+#include <future>
+#include <mutex>
+#include <fcntl.h>
+#include <unistd.h>
 //*******************FUNCTION****************************
 void parseAndSet(const std::string &input) {
     std::istringstream iss(input);
@@ -246,6 +252,15 @@ void interface_setting() {
     std::cout << std::endl;
 }
 
+
+std::string checkUserInput() { 
+    std::string userInput;
+    //printf("waiting");
+    std::cin >> userInput;
+    std::cout << userInput << std::endl;
+    return userInput;
+}
+
 //********************MAIN********************************
 int main(int argc, char *argv[]){
 
@@ -332,12 +347,52 @@ start_simulation:
    // kount++;
     //out_tissue(kount);
    // return 1;
+    int pauseInNext = 0;
+    //std::thread inputThread(checkUserInput);
+    //std::chrono::seconds timeout(0);
+    //std::future<std::string> future = std::async(std::launch::async, checkUserInput);
+    //checkUserInput();
     while(Time<tMAX){
 	//printf("Number of threads: %d\n", count);
         //GROWTH & DIVISION
         //for (int i = 1; i <= Nc; i++) {
         //    resolve_cross_cell(i);
         //}
+	/*
+	char buffer[256];
+        //ssize_t bytesRead = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
+	fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
+	//sleep(10);
+	int numRead = read(0, buffer, 4);
+        if (numRead > 0) {
+            //buffer[bytesRead] = '\0';
+            std::cout << "Read from stdin: " << buffer;
+	    if (buffer[0] == 'p') {
+		printf("Paused in next!!\n");
+		pauseInNext = 1;
+	    	std::cout << pauseInNext << std::endl;	
+	    }
+        }
+	*/
+//	std::cin.ignore();
+	/*
+	if (pauseInNext == 1) {
+	    std::cout << "Press enter to continue." << std::endl;
+	    while (true) {
+		
+	    }
+	    //return 0;
+	    pauseInNext = 0;
+	}
+	*/
+	//std::string content;
+	/*
+	if (future.wait_for(timeout) == std::future_status::ready)
+            content = future.get();
+	    std::cout << content << std::endl;
+	    future = std::async(checkUserInput);
+	*/
+	//thread checkinput(checkUserInput);	
 
 	//grows and divides cells according to custom rules
         growth_division();
@@ -357,7 +412,7 @@ start_simulation:
 	}
         edge_manipulation();
     }
-  
+    //inputThread.join();
     //DEALLOCATE
     deallocate();
     //*************************

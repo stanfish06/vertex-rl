@@ -8,21 +8,21 @@ float calc_forces(){
 float Fmax=0; 
 #pragma omp parallel num_threads(num_threads_force)
     {
-//	int thread_id = omp_get_thread_num();
+	int thread_id = omp_get_thread_num();
     	wA=0;
     	wL=0;
     	wS=0;
 //	if (thread_id == 0) {
             //AREA COMPRESSIBILITY
-   	    #pragma omp for schedule(dynamic, 1)//num_threads(num_threads_force)
+   	    #pragma omp for schedule(dynamic, 1)
        	    for(int i=1; i<=Nc; i++) if(exist[3][i]==1) wA+=c_AreaCompressibility_force_New(i);
 //	} else if (thread_id == 1) {
     	    //LINE ENERGY
-   	    #pragma omp for schedule(dynamic, 1)//num_threads(num_threads_force)
+   	    #pragma omp for schedule(dynamic, 1)
     	    for(int i=1; i<=Ne; i++) if(exist[2][i]==1) wL += e_length_force(i);
 //    	} else if (thread_id == 2) {
     	    //VERTEX-EDGE STERIC INTERACTION & SHOULDER INTERACTION
-    	    #pragma omp for schedule(dynamic, 1)//num_threads(num_threads_force)
+    	    #pragma omp for schedule(dynamic, 1)
     	    for(int i=1; i<=Ne; i++) if(exist[2][i]==1){
                 int eCELL=e_cells[i][1];
                 for(int j=1; j<=Nv; j++) if(exist[1][j]==1){
@@ -31,18 +31,18 @@ float Fmax=0;
             	    if(vCELL!=eCELL && Time>=ve_next_time[i][j]) wS+=ve_steric_force(i,j);
        	        }
     	    }
-    }
+//   	}
 //	} else if (thread_id == 3) {
-    	    //VERTEX-VERTEX SHOULDER INTERACTION
+
 	#pragma omp barrier    
 	#pragma omp parallel for num_threads(num_threads_force)
-    	    for(int i=1; i<=Nv; i++) if(exist[1][i]==1){
-                int vCELL1=v_cells[i][1];
-                for(int j=i+1; j<=Nv; j++) if(exist[1][j]==1){
-            	    int vCELL2=v_cells[j][1];
-                    if(vCELL1!=vCELL2 && Time>=vv_next_time[i][j]) wS+=vv_steric_shoulder_force(i,j);
-                }
+    	for(int i=1; i<=Nv; i++) if(exist[1][i]==1){
+            int vCELL1=v_cells[i][1];
+            for(int j=i+1; j<=Nv; j++) if(exist[1][j]==1){
+                int vCELL2=v_cells[j][1];
+                if(vCELL1!=vCELL2 && Time>=vv_next_time[i][j]) wS+=vv_steric_shoulder_force(i,j);
             }
+        }
 //	} 
 	//else if (thread_id == 4) {
     	    //MAX FORCE
@@ -54,12 +54,13 @@ float Fmax=0;
             //}
 	//}
     
-    //MAX FORCE
-    #pragma omp barrier
-    #pragma omp parallel for num_threads(num_threads_force)
-    for(int i = 1; i <= Nv; i++) if(exist[1][i]==1){
-         float foRce=sqrt(v_F[i][1]*v_F[i][1]+v_F[i][2]*v_F[i][2]);
-         if(foRce>Fmax) Fmax=foRce;
+	//MAX FORCE
+    	#pragma omp barrier
+    	#pragma omp parallel for num_threads(num_threads_force)
+    	for(int i = 1; i <= Nv; i++) if(exist[1][i]==1){
+            float foRce=sqrt(v_F[i][1]*v_F[i][1]+v_F[i][2]*v_F[i][2]);
+            if(foRce>Fmax) Fmax=foRce;
+        }
     }
 
     return Fmax;
