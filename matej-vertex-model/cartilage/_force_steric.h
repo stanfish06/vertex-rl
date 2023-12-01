@@ -77,12 +77,12 @@ float ve_steric_force(int i, int j){
             v_F[j][2]-=k0*(2*(v1x-v2x)*(v1y*(v2x-vx)+v2y*vx-v2x*vy+v1x*(-v2y+vy)))/l2;
             c_growth[cID] = 0;
 	    c_growth[cell_j] = 0;
-	    if (c_shrink[cID] == 0) {
+	    if (c_shrink[cID] == 0 && c_A0[cID] >= 0.5 * celli_CV) {
 	        c_A0[cID] = c_A0[cID] * 0.85;
 		c_shrink[cID] = 1;
 	    }
-	    if (c_shrink[cell_j] == 0) {
-                c_A0[cell_j] = c_A0[cell_j] / 2;
+	    if (c_shrink[cell_j] == 0 && c_A0[cell_j] >= 0.5 * cellj_CV) {
+                c_A0[cell_j] = c_A0[cell_j] / 0.85;
 		c_shrink[cell_j] = 1;
             }		
         }
