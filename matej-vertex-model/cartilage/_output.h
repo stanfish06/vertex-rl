@@ -87,6 +87,40 @@ float out_polygons(int fcount){
     return 0;
 }
 
+float out_to_df(int fcount) {
+    char filename[100]; char filename2[100];
+    snprintf(filename, sizeof(char) * 100, "./output/snapshot_%d.txt", fcount);
+    //snprintf(filename2, sizeof(char) * 100, "./initial/last_snapshot_%d.txt", fcount);
+    FILE *file; file = fopen(filename, "wt");
+    //FILE *file2; file2 = fopen(filename2, "wt");
+    fprintf(file, "cell_id,v_x,v_y,vs_x,vs_y,c_x,c_y,A,A0,dead\n");
+    //fprintf(file2, "cell_id,v_x,v_y,vs_x,vs_y,c_x,c_y,A,A0,dead\n");
+    for (int i = 1; i <= Nc; i++) if(exist[3][i] == 1){
+	
+	float c_x = c_center[i][1];
+	float c_y = c_center[i][2];
+	float cell_A = c_area[i];
+	float cell_A0 = c_A0[i];
+	int cell_dead = c_dead[i];
+	
+        for(int j = 1; j <= c_vertices[i][0]; j++){
+            int vert_id=c_vertices[i][j];
+	    float v_x = v[vert_id][1];
+	    float v_y = v[vert_id][2];
+	    // Shoulder v xy is flipped for some reason, fix it later
+	    float vs_x = vS[vert_id][2];
+	    float vs_y = vS[vert_id][1];
+            fprintf(file, "%d,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%d\n", i, v_x, v_y, vs_x, vs_y, c_x, c_y, cell_A, cell_A0, cell_dead);
+           // fprintf(file2, "%d,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%d\n", i, v_x, v_y, vs_x, vs_y, c_x, c_y, cell_A, cell_A0, cell_dead);
+       }
+       
+    }
+    fclose(file);
+    //fclose(file2);
+    return 0;
+}
+
+
 float out_cell_centroid(int fcount) {
     char filename2[100]; char filename3[100];
     snprintf(filename2, sizeof(char) * 100, "./output/XC_%d.txt", fcount);
@@ -162,6 +196,7 @@ void out_tissue(int fcount){
     out_polygons(fcount);
     out_cell_centroid(fcount);
     out_cell_state(fcount);
+    out_to_df(fcount);
 }
 //****************************************************************************
 //void out_Vertissue2D(){
@@ -210,20 +245,6 @@ void out_tissue(int fcount){
 //        e_natural_id[cnt][2]=i;
 //    }
 //    nrE=cnt;
-//    
-//    //CELLS
-//    cnt=0;
-//    for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
-//        cnt++;
-//        c_natural_id[i][1]=cnt;
-//        c_natural_id[cnt][2]=i;
-//    }
-//    nrC=cnt;
-//    fprintf(file1, "%d  %d  %d\n\n", nrV, nrE, nrC);
-//    fprintf(file1, "%g  %g\n\n", perioXYZ[1], perioXYZ[2]);
-//    
-// 
-//    //VERTICES
 //    for(int i=1; i<=Nv; i++) if(exist[1][i]==1) fprintf(file1, "%f  %f\n", v[i][1], v[i][2]);
 //    fprintf(file1, "\n");
 //    

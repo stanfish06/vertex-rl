@@ -6,4 +6,5 @@ flow.png
 main.o
 first-snap.png
 last-snap.png
-
+*.asv
+*.swo

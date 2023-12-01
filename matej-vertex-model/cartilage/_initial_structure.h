@@ -67,6 +67,73 @@ void set_initial_fromFile(){
     
     fclose(file1);
 }
+
+int resume_from_snapshot(std::string filepath) {
+    //std::cout << filepath << std::endl;
+    std::ifstream snapshot(filepath);
+    if (!snapshot.is_open()) {
+        std::cerr << "Error opening the file" << std::endl;
+	return 1;
+    }
+
+    int numLines = -1;
+    
+    std::string line;
+    while (std::getline(snapshot, line)) {
+	//std::cout << line << std::endl;
+        numLines++;
+    }
+        
+    //printf("%d", numLines);
+    
+    snapshot.close();
+    snapshot.open(filepath);
+    
+    int current_cell_id = -1;
+    int first_v_id = -1;
+    int sides[2*max_num_edges] = {};
+    
+    for (int i = 0; i <= numLines; i++) {
+	std::getline(snapshot, line);
+	if (i == 0) {
+	    continue;
+	}
+        std::istringstream row(line);
+	int cell_id, cell_dead;
+        float v_x, v_y, vs_x, vs_y, c_x, c_y, cell_A, cell_A0;
+        char comma;
+        row >> cell_id >> comma >> v_x >> comma >> v_y >> comma >> vs_x >> comma >> vs_y >> comma >> c_x >> comma >> c_y >> comma >> cell_A >> comma >> cell_A0 >> comma >> cell_dead;
+	if (i == 1) {
+	    current_cell_id = cell_id;
+	    make_vertex(v_x, v_y);
+	    first_v_id = i;
+	} else {
+	    if (cell_id == current_cell_id) {
+	        make_vertex(v_x, v_y);
+		make_edge(i-1, i, 0);
+		sides[i - first_v_id] = i - 1;
+		c_A0[current_cell_id] = cell_A0;
+                c_dead[current_cell_id] = cell_dead;
+	    } else {
+		// make last cell
+		make_edge(i - 1, first_v_id, 0);
+		sides[i - first_v_id] = i - 1;
+		cell_sides(i - first_v_id, sides, 0);
+		make_cell(current_cell_id);
+		calc_cell_center(current_cell_id);
+		printf("make cell %d done", current_cell_id);
+		// begin new cell
+	        make_vertex(v_x, v_y);
+		first_v_id = i;
+		current_cell_id = cell_id;
+	    }
+	}
+    }
+    snapshot.close();
+    return 0;
+    
+}
+
 //****************************************************************************
 int read_and_set_domain() {
     std::ifstream domain_coords("./initial/domain_coords.txt");
@@ -227,7 +294,7 @@ void set_initial_singleCell(){
     float height = max_y; 
     // number of random samples
     srand(646);
-    int nrC_try =100;
+    int nrC_try =20;
     int nrC_per_row = int(width);
     int nrC_per_col = int(height);
     //V,E,P,C

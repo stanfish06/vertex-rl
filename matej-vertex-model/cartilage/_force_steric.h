@@ -18,6 +18,11 @@ float ve_steric_force(int i, int j){
 
     int cell_j = v_cells[j][1];
 
+    float celli_A = c_area[cID];
+    float cellj_A = c_area[cell_j];
+    float celli_CV = CV[get_subdomain(cID)];
+    float cellj_CV = CV[get_subdomain(cell_j)];
+
     float ss_lA_ci = CORE[get_subdomain(cID)];
     float ss_lA_cj = CORE[get_subdomain(cell_j)];
 
@@ -73,7 +78,7 @@ float ve_steric_force(int i, int j){
             c_growth[cID] = 0;
 	    c_growth[cell_j] = 0;
 	    if (c_shrink[cID] == 0) {
-	        c_A0[cID] = c_A0[cID] / 2;
+	        c_A0[cID] = c_A0[cID] * 0.85;
 		c_shrink[cID] = 1;
 	    }
 	    if (c_shrink[cell_j] == 0) {
@@ -99,7 +104,7 @@ float ve_steric_force(int i, int j){
 	    //printf("RdotN is %f\n", RdotN);
 	    float li=e_length[i];
             float l4=pow(li,4);
-            if (RdotN<lS*ss_cj) {
+            if (RdotN<lS*ss_cj && celli_A >= 0.3 * celli_CV) {
                 //v1
                 v_F[v1][1]-=(2*kS*(v1y - v2y)*((v1x - v2x)*(v2x - vx) + (v1y - v2y)*(v2y - vy))*(lS*ss_cj*li - v2y*vx + v1y*(-v2x + vx) + v1x*(v2y - vy) + v2x*vy))/l4;
                 v_F[v1][2]-=(-2*kS*(v1x - v2x)*((v1x - v2x)*(v2x - vx) + (v1y - v2y)*(v2y - vy))*(lS*ss_cj*li - v2y*vx + v1y*(-v2x + vx) + v1x*(v2y - vy) + v2x*vy))/l4;
@@ -107,7 +112,7 @@ float ve_steric_force(int i, int j){
                 v_F[v2][1]-=(-2*kS*(v1y - v2y)*(lS*ss_cj*li - v2y*vx + v1y*(-v2x + vx) + v1x*(v2y - vy) + v2x*vy)*(pow(v1x,2) + pow(v1y,2) + v2x*vx - v1x*(v2x + vx) + v2y*vy - v1y*(v2y + vy)))/l4;
                 v_F[v2][2]-=(2*kS*(v1x - v2x)*(lS*ss_cj*li - v2y*vx + v1y*(-v2x + vx) + v1x*(v2y - vy) + v2x*vy)*(pow(v1x,2) + pow(v1y,2) + v2x*vx - v1x*(v2x + vx) + v2y*vy - v1y*(v2y + vy)))/l4;
 	    }
-	    if (RdotN<lS*ss_ci) {
+	    if (RdotN<lS*ss_ci && cellj_A >= 0.3 * cellj_CV) {
 	        //i
                 v_F[j][1]-=(2*kS*(v1y - v2y)*(lS*ss_ci*li - v2y*vx + v1y*(-v2x + vx) + v1x*(v2y - vy) + v2x*vy))/(pow(v1x - v2x,2) + pow(v1y - v2y,2));
                 v_F[j][2]-=(2*kS*(-v1x + v2x)*(lS*ss_ci*li - v2y*vx + v1y*(-v2x + vx) + v1x*(v2y - vy) + v2x*vy))/(pow(v1x - v2x,2) + pow(v1y - v2y,2));

@@ -128,13 +128,26 @@ int min_exist_n_edges = 6;
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <thread>
-#include <chrono>
-#include <future>
-#include <mutex>
-#include <fcntl.h>
-#include <unistd.h>
 //*******************FUNCTION****************************
+int resumeSimulation(const std::string &input) {
+    std::istringstream iss(input);
+    std::string command, path;
+    iss >> command >> path;
+    size_t underscore_pos = path.find_last_of('_');
+    size_t dot_pos = path.find_last_of('.');
+    std::string numString = path.substr(underscore_pos + 1, dot_pos - underscore_pos - 1);
+    kount = std::stoi(numString);
+
+
+    ddTH=sqrt(pow(lthUP/2,2)+pow(lALERT,2));
+    ddTHS=sqrt(pow(lthUP/2,2)+pow(lS+lALERT,2));
+    vMAX=2.*maxDR/h0;
+    allocate();
+    if (read_and_set_domain() == 1) {printf("Domain setting fails"); return 1;}
+    if (read_and_set_interface() == 1) {printf("Interface setting fails"); return 1;}
+    if (resume_from_snapshot(path) == 1) {printf("Resume fails"); return 1;}
+    return 0;
+}
 void parseAndSet(const std::string &input) {
     std::istringstream iss(input);
     std::string command, parameter;
@@ -276,7 +289,7 @@ Commands:
   specify interface                     Specify the interface of simulation. Remember to enter points in clockwise order. Don't enter same point twice.
   ls interface                          Print current interface setting.
   run		     			Run simulation with current setting.    
-
+  resume [path2snapshot]                Resume simulation with the setting provided in the file.
 Examples:
 )";
 
@@ -311,7 +324,10 @@ Examples:
         } else if (strcmp(buf, "run") == 0) {
             printf("Starting...\n");
 	    goto start_simulation;
-	} else {
+	} else if (buf_str.substr(0, 6) == "resume") {
+	    if (resumeSimulation(buf_str) == 1) {printf("Resuming simulation fails.\n"); return 1;};
+            goto resume_simulation;	    
+        } else {
 	    printf("Unknown command\n");
 	}
 //	free(buf);
@@ -334,6 +350,7 @@ start_simulation:
     set_initial_singleCell();
     //return 1;
     //*************************
+resume_simulation:
     int MAX = 20; 
     int count = 0;
     //#pragma omp parallel num_threads(MAX)
@@ -400,6 +417,7 @@ start_simulation:
         //EQUATION OF MOTION
         //calculates forces on vertices and performs 1 integration step
         if(eqOfMotion()==0) break;
+	vMAX=2.*maxDR/h;
         
         //TOPOLOGICAL TRANSITIONS
         //makes sure that edges are not too long or too short
@@ -411,6 +429,7 @@ start_simulation:
 	    resolve_cross_cell(i);
 	}
         edge_manipulation();
+//	out_to_df();
     }
     //inputThread.join();
     //DEALLOCATE

@@ -228,8 +228,8 @@ void growth_division(){
 	//}
 	// maximum desired volume is slightly bigger than the minimum division volume as optimal area is going to be slightly smaller than the desired area due to other forces
         if(c_growth[i]==0 && c_dead[i] == 0 && c_A0[i] <= cell_volume * 1.5) c_growth[i]=1;
-        else if (c_growth[i]==1 && c_A0[i] <= cell_volume * 1.5) c_A0[i]+=h * 1.2 * (1 - c_A0[i]/(1.5*cell_volume));
-	else if (c_growth[i]==1 && c_A0[i] > cell_volume * 1.5) c_growth[i] = 0;
+        else if (c_growth[i]==1 && c_A0[i] <= cell_volume * 1.5) c_A0[i]+=h * 5 * (1 - c_A0[i]/(1.5*cell_volume));
+//	else if (c_growth[i]==1 && c_A0[i] > cell_volume * 1.5) c_growth[i] = 0;
         //printf("Cell area: %f", c_A0[i]);
 	if (cell_domain == 3 && c_area[i] >= 0.8 * cell_volume && c_dead[i] == 0) {
 	    if (h * 1/10 > rnd()) {
@@ -243,11 +243,11 @@ void growth_division(){
         if(c_area[i]>cell_volume && c[i][0]>=min_division_n_edges) {
 	    if (cell_domain == 1 && h * 0.8 > rnd()) {
                printf("start division");
-               int cNEW=DIVIDE_CELL(i,0.05,cell_domain);
+               int cNEW=DIVIDE_CELL(i,0.001,cell_domain);
               // c_A0[i]=1; c_A0[cNEW]=1;
 	      // When elastic modulues increases, make desired area slightly smaller so cell does not bounce back too quick
-	       c_A0[i] = cell_volume;
-	       c_A0[cNEW] = cell_volume;
+	       c_A0[i] = 0.5 * cell_volume;
+	       c_A0[cNEW] = 0.5 * cell_volume;
                c_growth[i]=0; c_growth[cNEW]=0;
 	    }
         }
