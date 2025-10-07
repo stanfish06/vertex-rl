@@ -1,5 +1,6 @@
 # What's this for?
-This repo contains a modified version of Matej's vertex model, which is used for cartilage simulation.
+This repo contains a modified version of Matej Krajnc's vertex model, which is used for cartilage simulation.
+[Matej's research home page](https://matejkrajnc.splet.arnes.si/research/)
 
 # How to run?
 -  Clone the repo
