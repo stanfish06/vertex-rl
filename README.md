@@ -15,3 +15,9 @@ g++ main.c -O3 -o main.o -fopenmp -lreadline
 -  Run the matlab script [simulation_initialization_and_visualization.mlx](matej-vertex-model/simulation_initialization_and_visualization.mlx) under `matej-vertex-model` folder
 -  Follow the steps in the matlab script
 -  Run `main.o`. Enter `help` for more details.
+
+# Example
+<p align="center">
+  <img src="flow.png" alt="example" width="300"/>
+  <img src="simulation.gif" alt="example animation" width="300"/>
+</p>
