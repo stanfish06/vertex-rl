@@ -1,23 +1,15 @@
-# What's this for?
-This repo contains a modified version of Matej Krajnc's vertex model, which is used for cartilage simulation.
-[Matej's research home page](https://matejkrajnc.splet.arnes.si/research/)
+# vertex-rl
 
-# How to run?
--  Clone the repo
--  Go into `cartilage` folder
-```
-cd matej-vertex-model/cartilage
-```
--  Compile the program
-```
-g++ main.c -O3 -o main.o -fopenmp -lreadline
-```
--  Run the matlab script [simulation_initialization_and_visualization.mlx](matej-vertex-model/simulation_initialization_and_visualization.mlx) under `matej-vertex-model` folder
--  Follow the steps in the matlab script
--  Run `main.o`. Enter `help` for more details.
+2D/3D vertex model with RL training on cellular action model
 
-# Example
-<p align="center">
-  <img src="flow.png" alt="example" width="300"/>
-  <img src="simulation.gif" alt="example animation" width="300"/>
-</p>
+## Synthetic simulations
+
+| 2D | 3D |
+| :---: | :---: |
+| <img src="examples/animations/four-regions-2d.gif" width="360" alt="Cell growth and division in a square split into four quadrants"> | <img src="examples/animations/eight-regions-3d.gif" width="360" alt="Cell growth and division in a cube split into eight octants"> |
+
+## Cartilage simulation
+
+| Trajectories | Live simulation |
+| :---: | :---: |
+| <img src="flow.png" width="425" alt="Growth plate with labeled chondrocyte zones, bone, and overlaid flow arrows"> | <img src="simulation.gif" width="360" alt="Cartilage simulation from the previous master branch"> |

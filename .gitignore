@@ -6,3 +6,6 @@ first-snap.png
 last-snap.png
 *.asv
 *.swo
+
+# devflow artifacts (cloud-synced)
+.devflow/tasks/

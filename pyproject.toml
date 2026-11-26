@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vertex-rl"
+version = "0.1.0"
+description = "Gymnasium and PettingZoo environments for 2D and 3D vertex models"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "gymnasium>=1.0", "pettingzoo>=1.24"]
+
+[tool.setuptools]
+packages = ["vertex_rl", "model"]
