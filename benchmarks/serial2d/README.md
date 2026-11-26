@@ -2,6 +2,8 @@
 
 This rectangle exercises fresh placement, adaptive integration, cell division and legacy output on the dev solver. Use it to check a candidate's trajectory before measuring speed.
 
+For launch-to-exit timing at several thread counts, use the [paired dev and candidate benchmark](paired.md).
+
 ## Reproduce the run
 
 From the repository root, use a C++17 compiler with OpenMP, GNU Readline development files and Python 3.9 or later. Give each launch a new directory.
