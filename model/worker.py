@@ -21,11 +21,12 @@ def integer(value, name, minimum, maximum):
 
 
 class Worker:
-    def __init__(self, path):
+    def __init__(self, path, threads=1):
+        self.threads = integer(threads, "threads", 1, 2**31 - 1)
         self.lib = ctypes.CDLL(str(path.resolve()))
         names = ctypes.POINTER(ctypes.c_char_p)
         values = ctypes.POINTER(ctypes.c_double)
-        self.lib.vertex2d_reset.argtypes = (ctypes.c_uint, ctypes.c_int, names, values)
+        self.lib.vertex2d_reset.argtypes = (ctypes.c_uint, ctypes.c_int, ctypes.c_int, names, values)
         self.lib.vertex2d_advance.argtypes = (ctypes.c_double,)
         self.lib.vertex2d_export.argtypes = (ctypes.c_int,)
         self.lib.vertex2d_error.restype = self.lib.vertex2d_measure.restype = ctypes.c_char_p
@@ -52,7 +53,7 @@ class Worker:
         n = len(parameters)
         names = (ctypes.c_char_p * n)(*(key.encode() for key in parameters))
         values = (ctypes.c_double * n)(*(number(v, k) for k, v in parameters.items()))
-        result = self.lib.vertex2d_reset(seed, n, names, values)
+        result = self.lib.vertex2d_reset(seed, self.threads, n, names, values)
         if result == -2:
             raise ValueError(self.error())
         if result:
@@ -114,12 +115,15 @@ class Worker:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("library", type=Path)
+    parser.add_argument("--threads", type=int, default=1, help="solver thread count, retained on reset")
     args = parser.parse_args()
+    if not 1 <= args.threads <= 2**31 - 1:
+        parser.error("--threads must be a positive integer in the native int range")
     # Legacy native routines print diagnostics to fd 1. Reserve the original
     # stdout pipe exclusively for complete protocol replies.
     with os.fdopen(os.dup(sys.stdout.fileno()), "w", encoding="utf-8") as replies:
         os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
-        worker = Worker(args.library)
+        worker = Worker(args.library, args.threads)
         for line in sys.stdin:
             try:
                 reply = worker.handle(json.loads(line))

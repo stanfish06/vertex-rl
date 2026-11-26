@@ -128,70 +128,16 @@ float c_AdotCalc(int i){
     return 0.5*sum;
 }
 //****************************************************************************
-void v_AreaCompressibility_force_New(int j, int cellID, float _Cellarea){
-    
-    int vert_ref_id=c_vertices[cellID][1];
-    float vrefx = v[vert_ref_id][1];
-    float vrefy = v[vert_ref_id][2];
-    
-    
-    //vertices (adjacent)
-    int v1, v2;
-    if(j==c_vertices[cellID][0]){
-        v1=c_vertices[cellID][j];
-        v2=c_vertices[cellID][1];
+void assemble_area_force(int cell, ForceWorkspace& work) {
+    int n = c_vertices[cell][0];
+    float derivative = -2.*kA*(c_area[cell]-c_A0[cell]);
+    for (int j = 1; j <= n; ++j) {
+        int a = c_vertices[cell][j];
+        int b = c_vertices[cell][j == n ? 1 : j + 1];
+        // Each polygon owns its vertices. At vertex 1 the outgoing edge
+        // comes first; all other vertices see the incoming edge first.
+        work.area_terms[a][j == 1 ? 0 : 1] = {derivative*(v[b][2]/2.), derivative*(-v[b][1]/2.)};
+        work.area_terms[b][j == n ? 1 : 0] = {derivative*(-v[a][2]/2.), derivative*(v[a][1]/2.)};
     }
-    else {
-        v1=c_vertices[cellID][j];
-        v2=c_vertices[cellID][j+1];
-    }
-    
-    //v1
-    float v1x=v[v1][1];
-    float v1y=v[v1][2];
-    //x
-    //if(fabs(v1x-vrefx)>perioXYZ[1]/2.){
-    //    if(v1x<vrefx) v1x+=perioXYZ[1];
-    //    else if(v1x>vrefx) v1x-=perioXYZ[1];
-    //}
-    //y
-    //if(fabs(v1y-vrefy)>perioXYZ[2]/2.){
-    //    if(v1y<vrefy) v1y+=perioXYZ[2];
-    //    else if(v1y>vrefy) v1y-=perioXYZ[2];
-    //}
-    
-    //v2
-    float v2x=v[v2][1];
-    float v2y=v[v2][2];
-    //x
-    //if(fabs(v2x-vrefx)>perioXYZ[1]/2.){
-    //    if(v2x<vrefx) v2x+=perioXYZ[1];
-    //    else if(v2x>vrefx) v2x-=perioXYZ[1];
-    //}
-    //y
-    //if(fabs(v2y-vrefy)>perioXYZ[2]/2.){
-    //    if(v2y<vrefy) v2y+=perioXYZ[2];
-    //    else if(v2y>vrefy) v2y-=perioXYZ[2];
-    //}
-    
-    // As cell area increases, the contraction force increases. Potential energe increase due to area change
-    float _deriv = -2.*kA*(_Cellarea-c_A0[cellID]);
-    
-   // printf("Force is %f", _deriv);
-    
-    //v1
-    v_F[v1][1] += _deriv*(v2y/2.);
-    v_F[v1][2] += _deriv*(-v2x/2.);
-    //v2
-    v_F[v2][1] += _deriv*(-v1y/2.);
-    v_F[v2][2] += _deriv*(v1x/2.);
-    
+    work.area_energy[cell] = kA*pow(c_area[cell]-c_A0[cell], 2);
 }
-//****************************************************************************
-float c_AreaCompressibility_force_New(int i){
-    float _Cellarea=c_area[i];
-#pragma omp parallel for num_threads(num_threads_force)
-    for(int j=1; j<=c_vertices[i][0]; j++ ) v_AreaCompressibility_force_New(j,i,_Cellarea);
-    return kA*pow(_Cellarea-c_A0[i],2);
-}
-//****************************************************************************

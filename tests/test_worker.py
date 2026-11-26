@@ -14,10 +14,10 @@ FIXTURE = ROOT / "benchmarks" / "serial2d" / "initial"
 
 
 class WorkerClient:
-    def __init__(self, directory, library):
+    def __init__(self, directory, library, threads):
         self.errors = tempfile.TemporaryFile(mode="w+")
         self.process = subprocess.Popen(
-            [sys.executable, str(ROOT / "model/worker.py"), str(library)],
+            [sys.executable, str(ROOT / "model/worker.py"), str(library), "--threads", str(threads)],
             cwd=directory, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=self.errors, text=True,
         )
@@ -57,8 +57,8 @@ class WorkerTests(unittest.TestCase):
         shutil.copytree(FIXTURE, self.directory / "initial")
         self.worker = self.start()
 
-    def start(self):
-        client = WorkerClient(self.directory, self.library)
+    def start(self, threads=1):
+        client = WorkerClient(self.directory, self.library, threads)
         self.addCleanup(client.close)
         self.assertEqual(client.call("ping"), {"status": "ready"})
         return client
@@ -143,6 +143,22 @@ class WorkerTests(unittest.TestCase):
         self.assertNotEqual(self.worker.call("step", deadline=0.005)["cells"], first["cells"])
         self.assertEqual(self.worker.call("reset", **settings), original)
         self.assertEqual(self.worker.call("step", deadline=0.005), first)
+
+    def test_thread_count_replays_through_division_and_reset(self):
+        settings = dict(seed=646, time_limit=2)
+        def trajectory(client):
+            frames = [client.call("reset", **settings)]
+            for deadline in (0.25, 1.5, 2):
+                frames.append(client.call("step", deadline=deadline))
+            return frames
+        reference = trajectory(self.worker)
+        self.assertEqual(reference[-1]["status"], "truncated")
+        self.assertGreater(len(reference[-1]["cells"]), len(reference[0]["cells"]))
+        for threads in (2, 4):
+            with self.subTest(threads=threads):
+                worker = self.start(threads)
+                self.assertEqual(trajectory(worker), reference)
+                self.assertEqual(trajectory(worker), reference)
 
     def test_empty_tissue(self):
         (self.directory / "initial/domain_coords.txt").write_text("0,0\n1,0\n1,1\n0,1\n")

@@ -1,0 +1,36 @@
+--- a/model/_cell_division.h
++++ b/model/_cell_division.h
+@@ -26,0 +27,17 @@
++// Qualification-only instrumentation for the single-thread dev run.
++void trace_draw(int cell, const char* event, float draw, float outcome) {
++    static FILE* stream = nullptr;
++    if (!stream) {
++        stream = fopen(getenv("VERTEX_FATE_TRACE"), "w");
++        if (!stream) { perror("opening fate trace"); abort(); }
++        fprintf(stream, "time,cell_id,event,draw,outcome\n");
++    }
++    fprintf(stream, "%.9g,%d,%s,%.9g,%.9g\n", Time, cell, event, draw, outcome);
++}
++
++bool trial_draw(int cell, const char* event, double threshold) {
++    float draw = rnd();
++    bool accepted = threshold > draw;
++    trace_draw(cell, event, draw, accepted);
++    return accepted;
++}
+@@ -43 +60,3 @@
+-	angl = M_PI * rnd();
++	float draw = rnd();
++        angl = M_PI * draw;
++        trace_draw(i, "angle", draw, angl);
+@@ -47 +66,3 @@
+-	angl=M_PI * rnd();
++	float draw = rnd();
++        angl = M_PI * draw;
++        trace_draw(i, "angle", draw, angl);
+@@ -235 +256 @@
+-	    if (h * 1/10 > rnd()) {
++	    if (trial_draw(i, "death", h * 1/10)) {
+@@ -244 +265 @@
+-	    if (cell_domain == 1 && h * 0.8 > rnd()) {
++	    if (cell_domain == 1 && trial_draw(i, "divide", h * 0.8)) {

@@ -6,6 +6,7 @@
 //float **e_t;
 //float **e_n;
 void reset_arrays(){
+    force_topology_changed = true;
     
     Nv = 0; Ne = 0; Nc = 0;
     

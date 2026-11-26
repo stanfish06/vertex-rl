@@ -49,8 +49,12 @@ std::string state_json() {
 extern "C" {
 const char* vertex2d_error() { return last_error.c_str(); }
 
-int vertex2d_reset(unsigned seed, int n, const char** names, const double* values) {
+int vertex2d_reset(unsigned seed, int threads, int n, const char** names, const double* values) {
     try {
+        if (threads < 1) {
+            last_error = "thread count must be positive";
+            return -2;
+        }
         // Validate all overrides before replacing an existing episode.
         for (int i = 0; i < n; ++i) {
             auto* option = find_parameter(names[i]);
@@ -65,7 +69,7 @@ int vertex2d_reset(unsigned seed, int n, const char** names, const double* value
         for (auto& parameter : model_parameters) parameter.reset();
         for (int i = 0; i < n; ++i) find_parameter(names[i])->set(values[i]);
         verbose_solver = false;
-        set_solver_threads(1);
+        set_solver_threads(threads);
         solver.reset(seed);
         return 0;
     } catch (const std::exception& error) {

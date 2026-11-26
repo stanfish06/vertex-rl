@@ -1,6 +1,6 @@
 # Persistent 2D solver
 
-A worker owns one seeded simulation. It accepts a JSON object per line on stdin and flushes one JSON reply per line to stdout. Diagnostics go to stderr. Each process reads the five domain files in its working directory's `initial/` and writes requested frames to its own `output/`. The solver uses one thread per worker.
+A worker owns one seeded simulation. It accepts a JSON object per line on stdin and flushes one JSON reply per line to stdout. Diagnostics go to stderr. Each process reads the five domain files in its working directory's `initial/` and writes requested frames to its own `output/`. The solver uses one thread per worker by default. Supply a positive integer with `--threads N` at process launch to use the same force-thread budget across resets. Built-in fate draws and topology mutations run in serial order.
 
 ## Build and run
 
