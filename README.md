@@ -1,10 +1,15 @@
-## vertex-rl
-2D/3D vertex model with RL training
+# vertex-rl
 
-[Build and run the serial 2D reference benchmark](benchmarks/serial2d/README.md).
+2D/3D vertex model with RL training on cellular action model
 
-[Run a persistent 2D worker and advance to a decision time](model/worker.md).
+## Synthetic simulations
 
-[Build the 3D solver, bisect a cell, and open the time series in ParaView](model/three_d/README.md).
+| 2D | 3D |
+| :---: | :---: |
+| <img src="examples/animations/four-regions-2d.gif" width="360" alt="Cell growth and division in a square split into four quadrants"> | <img src="examples/animations/eight-regions-3d.gif" width="360" alt="Cell growth and division in a cube split into eight octants"> |
 
-[Configure a Python experiment and train tissue or cell policies](vertex_rl/README.md).
+## Cartilage simulation
+
+| Trajectories | Live simulation |
+| :---: | :---: |
+| <img src="flow.png" width="425" alt="Growth plate with labeled chondrocyte zones, bone, and overlaid flow arrows"> | <img src="simulation.gif" width="360" alt="Cartilage simulation from the previous master branch"> |
