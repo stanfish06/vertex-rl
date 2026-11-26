@@ -1,300 +1,91 @@
-//****************************************************************************
-//****************************************************************************
-//******************************OUTPUT****************************************
-//****************************************************************************
-//****************************************************************************
-//****************************************************************************
-//****************************************************************************
-FILE* open_output(const char* filename, const char* mode) {
-    FILE* stream = fopen(filename, mode);
-    if (!stream) {
-        perror(filename);
-        exit(EXIT_FAILURE);
-    }
-    return stream;
-}
+#include <array>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
-void close_output(FILE* stream) {
-    if (ferror(stream) || fclose(stream) != 0) {
-        perror("writing simulation output");
-        exit(EXIT_FAILURE);
-    }
-}
+struct BoundaryVertex {
+    float x, y, shoulder_x, shoulder_y;
+};
 
-float out_polygons(int fcount){
-    
-    
-    char filename2[100]; char filename3[100];
-    snprintf(filename2, sizeof(char) * 100, "./output/X_%d.txt", fcount);
-    snprintf(filename3, sizeof(char) * 100, "./output/Y_%d.txt", fcount);
-    
-    float *dxdydz = new float[3];
-    dxdydz[1]=0; dxdydz[2]=0;
-    int vert_ref_id, vert_id;
-    FILE *file2; file2 = open_output(filename2, "wt");
-    FILE *file3; file3 = open_output(filename3, "wt");
-    
-    for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
-        
-        int srgn=1;
-            
-        fprintf(file2, "%d ", srgn*c_vertices[i][0]);
-        fprintf(file3, "%d ", srgn*c_vertices[i][0]);
-            
-        vert_ref_id=c_vertices[i][1];
-        fprintf(file2, "%.16g ", v[vert_ref_id][1]);
-        fprintf(file3, "%.16g ", v[vert_ref_id][2]);
-            
-        for(int j = 2; j <= c_vertices[i][0]; j++){
-            vert_id=c_vertices[i][j];
-            torus_dx_dy_dz(dxdydz,vert_id,vert_ref_id);
-            fprintf(file2, "%.16g ", v[vert_id][1] + dxdydz[1]);
-            fprintf(file3, "%.16g ", v[vert_id][2] + dxdydz[2]);
+struct Cell2D {
+    int id, zone, dead, growing;
+    float x, y, area, target_area;
+    std::vector<BoundaryVertex> vertices;
+};
+
+struct Tissue2D {
+    double time = 0;
+    std::vector<Cell2D> cells;
+};
+
+Tissue2D measure_tissue(double time) {
+    Tissue2D tissue{time, {}};
+    for (int i = 1; i <= Nc; ++i) if (exist[3][i]) {
+        Cell2D cell{i, get_subdomain(i), c_dead[i], c_growth[i],
+                    c_center[i][1], c_center[i][2], c_area[i], c_A0[i], {}};
+        cell.vertices.reserve(c_vertices[i][0]);
+        for (int j = 1; j <= c_vertices[i][0]; ++j) {
+            int id = c_vertices[i][j];
+            cell.vertices.push_back({v[id][1], v[id][2], vS[id][1], vS[id][2]});
         }
-            
-        for(int j = c_vertices[i][0]; j <= 15; j++){
-            fprintf(file2, "0 ");
-            fprintf(file3, "0 ");
+        tissue.cells.push_back(std::move(cell));
+    }
+    return tissue;
+}
+
+class OutputFile {
+    std::string path;
+    std::unique_ptr<FILE, decltype(&fclose)> stream;
+public:
+    OutputFile(const std::string& filename, const char* mode = "w")
+        : path("./output/" + filename), stream(fopen(path.c_str(), mode), fclose) {
+        if (!stream) throw std::runtime_error("cannot open " + path);
+    }
+    FILE* get() const { return stream.get(); }
+    void finish() {
+        bool failed = ferror(stream.get());
+        if (fclose(stream.release()) != 0 || failed) throw std::runtime_error("cannot write " + path);
+    }
+};
+
+void export_tissue(const Tissue2D& tissue, int frame) {
+    const std::string suffix = "_" + std::to_string(frame) + ".txt";
+    OutputFile xs("X" + suffix), ys("Y" + suffix), sx("XS" + suffix), sy("YS" + suffix);
+    OutputFile cx("XC" + suffix), cy("YC" + suffix), flags("C_dead" + suffix);
+    OutputFile snapshot("snapshot" + suffix);
+    fprintf(snapshot.get(), "cell_id,v_x,v_y,vs_x,vs_y,c_x,c_y,A,A0,dead\n");
+    for (const Cell2D& cell : tissue.cells) {
+        std::array<FILE*, 4> polygons{xs.get(), ys.get(), sx.get(), sy.get()};
+        for (FILE* file : polygons) fprintf(file, "%zu ", cell.vertices.size());
+        for (const auto& point : cell.vertices) {
+            fprintf(xs.get(), "%.16g ", point.x);
+            fprintf(ys.get(), "%.16g ", point.y);
+            fprintf(sx.get(), "%.16g ", point.shoulder_x);
+            fprintf(sy.get(), "%.16g ", point.shoulder_y);
+            // The dev snapshot format stores the two shoulder columns in this order.
+            fprintf(snapshot.get(), "%d,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%d\n",
+                    cell.id, point.x, point.y, point.shoulder_y, point.shoulder_x, cell.x,
+                    cell.y, cell.area, cell.target_area, cell.dead);
         }
-            
-        fprintf(file2, "\n");
-        fprintf(file3, "\n");
-    }
-    close_output(file2);
-    close_output(file3);
-    
-    //SHOULDER
-    char filename4[100]; char filename5[100];
-    snprintf(filename4, sizeof(char) * 100, "./output/XS_%d.txt", fcount);
-    snprintf(filename5, sizeof(char) * 100, "./output/YS_%d.txt", fcount);
-    FILE *file4; file4 = open_output(filename4, "wt");
-    FILE *file5; file5 = open_output(filename5, "wt");
-    for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
-        
-        int srgn=1;
-            
-        fprintf(file4, "%d ", srgn*c_vertices[i][0]);
-        fprintf(file5, "%d ", srgn*c_vertices[i][0]);
-            
-        vert_ref_id=c_vertices[i][1];
-        fprintf(file4, "%.16g ", vS[vert_ref_id][1]);
-        fprintf(file5, "%.16g ", vS[vert_ref_id][2]);
-            
-        for(int j = 2; j <= c_vertices[i][0]; j++){
-            vert_id=c_vertices[i][j];
-            //torus_dx_dy_dzS(dxdydz,vert_id,vert_ref_id);
-            fprintf(file4, "%.16g ", vS[vert_id][1]);
-            fprintf(file5, "%.16g ", vS[vert_id][2]);
+        for (FILE* file : polygons) {
+            for (size_t j = cell.vertices.size(); j <= 15; ++j) fprintf(file, "0 ");
+            fprintf(file, "\n");
         }
-            
-        for(int j = c_vertices[i][0]; j <= 15; j++){
-            fprintf(file4, "0 ");
-            fprintf(file5, "0 ");
-        }
-            
-        fprintf(file4, "\n");
-        fprintf(file5, "\n");
+        fprintf(cx.get(), "%d %.16g \n", cell.id, cell.x);
+        fprintf(cy.get(), "%d %.16g \n", cell.id, cell.y);
+        fprintf(flags.get(), "%d %d \n", cell.id, cell.dead);
     }
-    close_output(file4);
-    close_output(file5);
-    
-    delete []dxdydz;
-    
-    return 0;
+    for (OutputFile* file : {&xs, &ys, &sx, &sy, &cx, &cy, &flags, &snapshot}) file->finish();
 }
 
-float out_to_df(int fcount) {
-    char filename[100]; char filename2[100];
-    snprintf(filename, sizeof(char) * 100, "./output/snapshot_%d.txt", fcount);
-    //snprintf(filename2, sizeof(char) * 100, "./initial/last_snapshot_%d.txt", fcount);
-    FILE *file; file = open_output(filename, "wt");
-    //FILE *file2; file2 = fopen(filename2, "wt");
-    fprintf(file, "cell_id,v_x,v_y,vs_x,vs_y,c_x,c_y,A,A0,dead\n");
-    //fprintf(file2, "cell_id,v_x,v_y,vs_x,vs_y,c_x,c_y,A,A0,dead\n");
-    for (int i = 1; i <= Nc; i++) if(exist[3][i] == 1){
-	
-	float c_x = c_center[i][1];
-	float c_y = c_center[i][2];
-	float cell_A = c_area[i];
-	float cell_A0 = c_A0[i];
-	int cell_dead = c_dead[i];
-	
-        for(int j = 1; j <= c_vertices[i][0]; j++){
-            int vert_id=c_vertices[i][j];
-	    float v_x = v[vert_id][1];
-	    float v_y = v[vert_id][2];
-	    // Shoulder v xy is flipped for some reason, fix it later
-	    float vs_x = vS[vert_id][2];
-	    float vs_y = vS[vert_id][1];
-            fprintf(file, "%d,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%d\n", i, v_x, v_y, vs_x, vs_y, c_x, c_y, cell_A, cell_A0, cell_dead);
-           // fprintf(file2, "%d,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%.16g,%d\n", i, v_x, v_y, vs_x, vs_y, c_x, c_y, cell_A, cell_A0, cell_dead);
-       }
-       
-    }
-    close_output(file);
-    //fclose(file2);
-    return 0;
-}
-
-
-float out_cell_centroid(int fcount) {
-    char filename2[100]; char filename3[100];
-    snprintf(filename2, sizeof(char) * 100, "./output/XC_%d.txt", fcount);
-    snprintf(filename3, sizeof(char) * 100, "./output/YC_%d.txt", fcount);
-    
-    //float *dxdydz = new float[3];
-    //dxdydz[1]=0; dxdydz[2]=0;
-    int vert_ref_id, vert_id;
-    FILE *file2; file2 = open_output(filename2, "wt");
-    FILE *file3; file3 = open_output(filename3, "wt");
-    for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
-        fprintf(file2, "%d ", i);
-        fprintf(file3, "%d ", i);
-
-        fprintf(file2, "%.16g ", c_center[i][1]);
-        fprintf(file3, "%.16g ", c_center[i][2]);
-            
-        fprintf(file2, "\n");
-        fprintf(file3, "\n");
-    }
-    close_output(file2);
-    close_output(file3);
-
-    return 0;
-}
-
-
-float out_cell_state(int fcount) {
-    char filename2[100];
-    snprintf(filename2, sizeof(char) * 100, "./output/C_dead_%d.txt", fcount);
-    
-    FILE *file2; file2 = open_output(filename2, "wt");
-    for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
-        fprintf(file2, "%d ", i);
-
-        fprintf(file2, "%d ", c_dead[i]);
-            
-        fprintf(file2, "\n");
-    }
-    close_output(file2);
-
-    return 0;
-}
-
-
-
-
-
-//****************************************************************************
-//float out_edges(int fcount){
-//
-//    char filename2[50];
-//    snprintf(filename2, sizeof(char) * 50, "./output/edges_%g_%d_%d_%d_%d.txt", P0, oneOvertauINT, RhoINT, THEedge, fcount);
-//
-//    float *dxdydz = new float[2]; dxdydz[0]=0; dxdydz[1]=0;
-//    FILE *file2; file2 = fopen(filename2, "wt");
-//
-//    for(int i=1; i<=Ne; i++) if(e[i][0]!=0){
-//        int vert_ref_id=e[i][1];
-//        int vert_id=e[i][2];
-//        torus_dx_dy_dz(dxdydz,vert_id,vert_ref_id);
-//        fprintf(file2, "%g  %g  %g  %g\n", v[vert_ref_id][1], v[vert_ref_id][2], v[vert_id][1] + dxdydz[0], v[vert_id][2] + dxdydz[1]);
-//    }
-//    fclose(file2);
-//
-//    delete []dxdydz;
-//
-//    return 0;
-//}
-//****************************************************************************
-void out_tissue(int fcount){
-    //out_edges(fcount);
-    out_polygons(fcount);
-    out_cell_centroid(fcount);
-    out_cell_state(fcount);
-    out_to_df(fcount);
+void export_scheduled_frame() {
+    ++kount;
+    export_tissue(measure_tissue(Time), kount);
     if (reference_output) {
-        FILE* index = open_output("./output/frame_index.csv", fcount == 1 ? "w" : "a");
-        if (fcount == 1) fprintf(index, "frame_id,scheduled_time,actual_time\n");
-        fprintf(index, "%d,%.9g,%.9g\n", fcount, TimeCount, Time);
-        close_output(index);
+        OutputFile index("frame_index.csv", kount == 1 ? "w" : "a");
+        if (kount == 1) fprintf(index.get(), "frame_id,scheduled_time,actual_time\n");
+        fprintf(index.get(), "%d,%.9g,%.9g\n", kount, TimeCount, Time);
+        index.finish();
     }
 }
-//****************************************************************************
-//void out_Vertissue2D(){
-//    
-//    char filename2[100];
-//    snprintf(filename2, sizeof(char) * 100, "./output/final_%g.vt2d", P0);
-//    FILE *file1; file1 = fopen(filename2, "wt");
-//    
-//    int nrV=0, nrE=0, nrC=0;
-//    
-//    //ALLOCATE INTERNAL VARIABLES
-//    int **v_natural_id; int **e_natural_id; int **c_natural_id;
-//    v_natural_id  = new int*[Nv+1]; e_natural_id  = new int*[Ne+1]; c_natural_id  = new int*[Nc+1];
-//    for(int i=0; i < Nv+1; i++) v_natural_id[i]  = new int[3];
-//    for(int i=0; i < Ne+1; i++) e_natural_id[i]  = new int[3];
-//    for(int i=0; i < Nc+1; i++) c_natural_id[i]  = new int[3];
-//    
-//    //RESET NATURAL IDS
-//    for(int i=1; i<=Nv; i++){
-//        v_natural_id[i][1]=0;
-//        v_natural_id[i][2]=0;
-//    }
-//    for(int i=1; i<=Ne; i++){
-//        e_natural_id[i][1]=0;
-//        e_natural_id[i][2]=0;
-//    }
-//    for(int i=1; i<=Nc; i++){
-//        c_natural_id[i][1]=0;
-//        c_natural_id[i][2]=0;
-//    }
-//    
-//    //VERTICES
-//    int cnt=0;
-//    for(int i=1; i<=Nv; i++) if(exist[1][i]==1){
-//        cnt++;
-//        v_natural_id[i][1]=cnt;
-//        v_natural_id[cnt][2]=i;
-//    }
-//    nrV=cnt;
-//    
-//    //EDGES
-//    cnt=0;
-//    for(int i=1; i<=Ne; i++) if(exist[2][i]==1){
-//        cnt++;
-//        e_natural_id[i][1]=cnt;
-//        e_natural_id[cnt][2]=i;
-//    }
-//    nrE=cnt;
-//    for(int i=1; i<=Nv; i++) if(exist[1][i]==1) fprintf(file1, "%f  %f\n", v[i][1], v[i][2]);
-//    fprintf(file1, "\n");
-//    
-//    //EDGES
-//    for(int i=1; i<=Ne; i++) if(exist[2][i]==1) fprintf(file1, "%d  %d\n", v_natural_id[e[i][1]][1], v_natural_id[e[i][2]][1]);
-//    fprintf(file1, "\n");
-//    
-//    //CELLS
-//    for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
-//        fprintf(file1, "%d  ", c[i][0]);
-//        for(int j=1; j<=c[i][0]; j++){
-//            if(c[i][j]<0) fprintf(file1, "%d  ", -e_natural_id[abs(c[i][j])][1]);
-//            else fprintf(file1, "%d  ", e_natural_id[abs(c[i][j])][1]);
-//        }
-//        for(int j=15; j>c[i][0]; j--){
-//            fprintf(file1, "0  ");
-//        }
-//        fprintf(file1, "\n");
-//    }
-//    
-//    //DEALLOCATE INTERNAL VARIABLES
-//    for(int i=0; i < Nv+1; ++i) delete [] v_natural_id[i] ;
-//    for(int i=0; i < Ne+1; ++i) delete [] e_natural_id[i] ;
-//    for(int i=0; i < Nc+1; ++i) delete [] c_natural_id[i] ;
-//    delete [] v_natural_id;
-//    delete [] e_natural_id;
-//    delete [] c_natural_id;
-//    
-//    fclose(file1);
-//}
-//****************************************************************************

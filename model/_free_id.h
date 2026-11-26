@@ -7,8 +7,7 @@ int getID(int vec){
     if(ids[vec][0]==0) {
         if ((vec == 1 && Nv == array_max) || (vec == 2 && Ne == array_max) ||
             (vec == 3 && Nc == array_max)) {
-            fprintf(stderr, "Solver array capacity %d exhausted (entity type %d)\n", array_max, vec);
-            exit(EXIT_FAILURE);
+            throw std::runtime_error("solver array capacity exhausted for entity " + std::to_string(vec));
         }
         if(vec==1)        { Nv++; return Nv; }
         else if(vec==2)   { Ne++; return Ne; }

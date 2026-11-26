@@ -53,7 +53,7 @@ bool is_cross(int e1, int e2) {
 
 // If a cell gets a cross, the flipped part will be eliminated
 void resolve_cross_cell(int cell_id) {
-    printf("Start resolving cell %d\n", cell_id);
+    if (verbose_solver) printf("Start resolving cell %d\n", cell_id);
     /* 
     int num_crosses = 0;
     if (c[cell_id][0] != 0) {

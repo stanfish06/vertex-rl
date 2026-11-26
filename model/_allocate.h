@@ -232,6 +232,8 @@ void deallocate(){
     delete [] c_Vedges  ;
     delete [] c_area  ;
     delete [] c_A0  ;
+    delete [] c_dead;
+    delete [] c_shrink;
     for(int i=0; i <= array_max; i++){
         delete [] c_center[i];
     }

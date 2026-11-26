@@ -144,93 +144,54 @@ void update_shoulder_vertices(){
     }
 }
 //****************************************************************************
-float eqOfMotion(){
-    
-    //EDGES & AREAS
-//#pragma omp parallel num_threads(num_threads_calculation)
-    {	    
-	calc_edges();
-	calc_areas();
-    }  
-    //CALCULATE FORCES    
-#pragma omp barrier
-    float FMAX=calc_forces();
-    
-    //TIME STEP (can be changed to adaptive time step)
-    //h = h0;
-    h=(maxDR * 0.9)/FMAX;
-    printf("Time step chosen is %f", h);
-    
-    //MAX DISPLACEMENT
-    float maxDISPLACEMENT=FMAX*h;
-    
-#pragma omp barrier
-    //PROPAGATE VERTICES
-//#pragma omp parallel num_threads(num_threads_update)
-    {
-	#pragma omp parallel for num_threads(num_threads_update)
-        for(int i=1; i<=Nv; i++) if(exist[1][i]==1){
-           // printf("x = %f", v[i][1]);
-	    //printf("y = %f", v[i][2]);
-	    int cell_id = v_cells[i][1];
-	    if (c_dead[cell_id] == 0) { 
-	        v[i][1]+=h*v_F[i][1];
-                v[i][2]+=h*v_F[i][2];
-	    }
-	    //v[i][1]+=h*v_F[i][1];
-            //v[i][2]+=h*v_F[i][2];
-	    //printf("dx = %f\n", h*v_F[i][1]);
-	   // printf("dy = %f\n", h*v_F[i][2]);
-            // torus_vertex(i);
-            vertex_correction(i);
-            for(int j=1; j<=2; j++) v_F[i][j]=0;
+// The CLI retains its original single-precision step and clock. Decision-mode
+// deadlines use double precision, including the final displacement multiplier.
+float integrate_motion(double& clock, double deadline, bool decision_mode) {
+    calc_edges();
+    calc_areas();
+    float FMAX = calc_forces();
+    h = (maxDR * 0.9) / FMAX;
+    double dt = h;
+    if (decision_mode) {
+        if (!std::isfinite(FMAX)) throw std::runtime_error("nonfinite force");
+        if (FMAX == 0) dt = h0;
+        dt = std::min(dt, deadline - clock);
+        if (!(dt > 0) || !std::isfinite(dt) || clock + dt == clock) {
+            throw std::runtime_error("invalid adaptive step");
         }
+        h = static_cast<float>(dt);
+    } else {
+        printf("Time step chosen is %f", h);
     }
-#pragma omp barrier
-    //PROJECT ON CONSTRAINTS
-//#pragma omp parallel num_threads(num_threads_update)
-    {
-	#pragma omp parallel for num_threads(num_threads_update)
-	//update_shoulder_vertices();
-        for(int i=1; i<=Nv; i++) if(exist[1][i]==1){
-            //if(v[i][2]<0.2*pow(v[i][1]-5,2)+4-10./3.) v[i][2]=0.2*pow(v[i][1]-5,2)+4-10./3.;
-            //if(v[i][2]>perioXYZ[2]) v[i][2]=perioXYZ[2];
-            vertex_correction(i);
-            calc_cell_center(i);
-            // torus_vertex(i);
+
+    float displacement = FMAX * h;
+    #pragma omp parallel for num_threads(num_threads_update)
+    for (int i = 1; i <= Nv; ++i) if (exist[1][i]) {
+        if (!c_dead[v_cells[i][1]]) {
+            for (int j = 1; j <= 2; ++j) {
+                if (decision_mode) v[i][j] += dt * v_F[i][j];
+                else v[i][j] += h * v_F[i][j];
+            }
         }
+        vertex_correction(i);
+        v_F[i][1] = v_F[i][2] = 0;
     }
-#pragma omp barrier
-//#pragma omp parallel num_threads(num_threads_update)
-    {
-        //UPDATE EDGES & AREAS
-	//#pragma omp single
-	update_edges();
-	//#pragma omp single
-	update_areas();
+    #pragma omp parallel for num_threads(num_threads_update)
+    for (int i = 1; i <= Nv; ++i) if (exist[1][i]) {
+        vertex_correction(i);
+        // Preserve the legacy traversal and its cached centers for CLI frames.
+        if (c_vertices[i][0] != 0) calc_cell_center(i);
     }
-    //UPDATE SHOULDER VERTICE
-    //#pragma omp single
+    update_edges();
+    update_areas();
     update_shoulder_vertices();
-    //t=t+dt
-    Time+=h;
-    if(Time>=TimeCount){
-        kount++; out_tissue(kount);
-        printf("Time=%g\tw=%.16g\t||\t%.16g\n", Time, wA+wS+wL, maxDISPLACEMENT);
-        TimeCount+=outFreq;
-    }
-    
-    //CHECK MAX DISPLACEMENT
-    if(maxDISPLACEMENT>maxDR){
-        printf("Displacement too big\n");
-        return 0;
-    }
 
-    //for (int i = 1; i <= Nc; i++) {
-    //    resolve_cross_cell(i);
-    //}
-
-    reset_c_shrink();
-    return maxDISPLACEMENT;
+    if (decision_mode) {
+        clock = dt == deadline - clock ? deadline : clock + dt;
+        Time = static_cast<float>(clock);
+    } else {
+        Time += h;
+        clock = Time;
+    }
+    return displacement;
 }
-//****************************************************************************

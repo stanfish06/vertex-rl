@@ -29,7 +29,7 @@ int DIVIDE_CELL(int i, float separ, int subdomain)
     //printf("Start dividing");
     calc_cell_center(i);
     
-    float ddx,ddy; float *dxdydz = new float[3];
+    float ddx,ddy;
     
     float kk;
     //float angl=M_PI*rnd();
@@ -77,6 +77,7 @@ int DIVIDE_CELL(int i, float separ, int subdomain)
         }
     }
     
+    if (!j1 || !j2) throw std::runtime_error("division line misses the polygon");
     int jj;
     if(j1>j2){
         jj=j1;
@@ -85,7 +86,7 @@ int DIVIDE_CELL(int i, float separ, int subdomain)
     }
     
     //******************************************************************************
-    int *c_copy = new int[array_max+1]; c_copy[0]=0;
+    int c_copy[200] = {};
     //******************************************************************************
 
     // This step is figuring out edge for division
@@ -164,7 +165,7 @@ int DIVIDE_CELL(int i, float separ, int subdomain)
     appendToList(c_copy,-ed2);
 
     //cell 2
-    int *sides; sides = new int[101]; sides[0]=0;
+    int sides[200] = {};
     int j=j2;
     if(c[i][j2]>0) appendToList(sides,e2NEW);
     else appendToList(sides,c[i][j2]);
@@ -189,9 +190,6 @@ int DIVIDE_CELL(int i, float separ, int subdomain)
 
 
     //******************************************************************************
-    delete []dxdydz;
-    delete [] c_copy;
-    delete [] sides;
     //******************************************************************************
 
     
@@ -207,8 +205,9 @@ void growth_division(){
     //}
     //nrSUSC = nrSUSC / proliferative_zone_area;
    // printf("Number of dividing cells: %f\n", nrSUSC);
-#pragma omp parallel for num_threads(num_threads_division)
-    for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
+    // New daughters enter the fate pass on the following substep.
+    const int initial_cells = Nc;
+    for(int i=1; i<=initial_cells; i++) if(exist[3][i]==1){
         //GROWTH
         //if(c_growth[i]==0 && rand() < 0.5) c_growth[i]=1;
         //if(c_growth[i]==0 && rnd()<0.00001/(nrSUSC*1.)) c_growth[i]=1;
