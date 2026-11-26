@@ -24,6 +24,29 @@ void calc_cell_center(int i){
     //delete []dxdydz;
 }
 //****************************************************************************
+// Opt-in qualification of the episode RNG stream. Only the serial fate pass
+// calls this function; the timed runs leave VERTEX_FATE_TRACE unset.
+void trace_fate(int cell, const char* event, float draw, float outcome) {
+    static const char* path = getenv("VERTEX_FATE_TRACE");
+    if (!path) return;
+    static std::unique_ptr<FILE, decltype(&fclose)> file([&]() {
+        FILE* stream = fopen(path, "w");
+        if (!stream) throw std::runtime_error("cannot open fate trace");
+        fprintf(stream, "time,cell_id,event,draw,outcome\n");
+        return stream;
+    }(), fclose);
+    if (fprintf(file.get(), "%.9g,%d,%s,%.9g,%.9g\n", Time, cell, event, draw, outcome) < 0) {
+        throw std::runtime_error("cannot write fate trace");
+    }
+}
+
+bool fate_draw(int cell, const char* event, double threshold) {
+    float draw = rnd();
+    bool accepted = threshold > draw;
+    trace_fate(cell, event, draw, accepted);
+    return accepted;
+}
+
 int DIVIDE_CELL(int i, float separ, int subdomain)
 {
     //printf("Start dividing");
@@ -35,17 +58,10 @@ int DIVIDE_CELL(int i, float separ, int subdomain)
     //float angl=M_PI*rnd();
     //float angl=M_PI;
     float c_y = c_center[i][2];
-    float angl;
-    if (subdomain == 1) {
-       	printf("Proliferative zone division\n");
-	// add small angle jitering
-	//angl=compute_division_angle(i) + M_PI / 36 * rnd();
-	angl = M_PI * rnd();
-    } else {
-	// If Dividing is way too disordered, vertex might but pushed out
-        //angl=compute_division_angle(i) + M_PI / 9 *rnd();
-	angl=M_PI * rnd();
-    }
+    if (subdomain == 1) printf("Proliferative zone division\n");
+    float draw = rnd();
+    float angl = M_PI * draw;
+    trace_fate(i, "angle", draw, angl);
     //printf("cell: %d", i);
     printf("angle: %f\n", angl);
     if(angl>M_PI/2.){
@@ -231,7 +247,7 @@ void growth_division(){
 //	else if (c_growth[i]==1 && c_A0[i] > cell_volume * 1.5) c_growth[i] = 0;
         //printf("Cell area: %f", c_A0[i]);
 	if (cell_domain == 3 && c_area[i] >= 0.8 * cell_volume && c_dead[i] == 0) {
-	    if (h * 1/10 > rnd()) {
+	    if (fate_draw(i, "death", h * 1/10)) {
 	        c_dead[i] = 1;
 		c_growth[i] = 0;
 		printf("Cell %d just died!\n", i);
@@ -240,7 +256,7 @@ void growth_division(){
 
 	// desired area will increase if it is smaller than 1.5 fold of the maximum area
         if(c_area[i]>cell_volume && c[i][0]>=min_division_n_edges) {
-	    if (cell_domain == 1 && h * 0.8 > rnd()) {
+	    if (cell_domain == 1 && fate_draw(i, "divide", h * 0.8)) {
                printf("start division");
                int cNEW=DIVIDE_CELL(i,0.001,cell_domain);
               // c_A0[i]=1; c_A0[cNEW]=1;

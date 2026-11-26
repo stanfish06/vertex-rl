@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -176,7 +177,10 @@ class Solver2D {
     Tissue2D committed;
 
     void release_workspace() {
-        if (allocated) deallocate();
+        if (allocated) {
+            deallocate();
+            force_workspace = {};
+        }
         allocated = false;
         release_domain();
     }

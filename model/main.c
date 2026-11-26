@@ -31,7 +31,13 @@ void parseAndSet(const std::string &input) {
     else if (parameter == "max_num_edges") max_num_edges = int(value);
     else if (parameter == "min_division_n_edges") min_division_n_edges = int(value);
     else if (parameter == "min_exist_n_edges") min_exist_n_edges = int(value);
-    else if (parameter == "number_of_threads") set_solver_threads(int(value));
+    else if (parameter == "number_of_threads") {
+        if (value < 1 || floor(value) != value || double(value) > std::numeric_limits<int>::max()) {
+            std::cerr << "Thread count must be a positive integer" << std::endl;
+            return;
+        }
+        set_solver_threads(static_cast<int>(value));
+    }
     else std::cout << "Unknown parameter: " << parameter << std::endl;
     std::cout << std::endl;
 }

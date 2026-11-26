@@ -1,71 +1,102 @@
-//****************************************************************************
-//****************************************************************************
-//***********************EQUATION OF MOTION***********************************
-//****************************************************************************
-//****************************************************************************
 #include <omp.h>
-float calc_forces(){    
-float Fmax=0; 
-#pragma omp parallel num_threads(num_threads_force)
-    {
-	int thread_id = omp_get_thread_num();
-    	wA=0;
-    	wL=0;
-    	wS=0;
-//	if (thread_id == 0) {
-            //AREA COMPRESSIBILITY
-   	    #pragma omp for schedule(dynamic, 1)
-       	    for(int i=1; i<=Nc; i++) if(exist[3][i]==1) wA+=c_AreaCompressibility_force_New(i);
-//	} else if (thread_id == 1) {
-    	    //LINE ENERGY
-   	    #pragma omp for schedule(dynamic, 1)
-    	    for(int i=1; i<=Ne; i++) if(exist[2][i]==1) wL += e_length_force(i);
-//    	} else if (thread_id == 2) {
-    	    //VERTEX-EDGE STERIC INTERACTION & SHOULDER INTERACTION
-    	    #pragma omp for schedule(dynamic, 1)
-    	    for(int i=1; i<=Ne; i++) if(exist[2][i]==1){
-                int eCELL=e_cells[i][1];
-                for(int j=1; j<=Nv; j++) if(exist[1][j]==1){
-            	    edge_vertex_int[j][i]=0;
-            	    int vCELL=v_cells[j][1];
-            	    if(vCELL!=eCELL && Time>=ve_next_time[i][j]) wS+=ve_steric_force(i,j);
-       	        }
-    	    }
-//   	}
-//	} else if (thread_id == 3) {
 
-	#pragma omp barrier    
-	#pragma omp parallel for num_threads(num_threads_force)
-    	for(int i=1; i<=Nv; i++) if(exist[1][i]==1){
-            int vCELL1=v_cells[i][1];
-            for(int j=i+1; j<=Nv; j++) if(exist[1][j]==1){
-                int vCELL2=v_cells[j][1];
-                if(vCELL1!=vCELL2 && Time>=vv_next_time[i][j]) wS+=vv_steric_shoulder_force(i,j);
-            }
+void assemble_edge_row(int i, ContactWrites& writes) {
+    auto& marks = force_workspace.marked_vertices[i];
+    for (int j : marks) edge_vertex_int[i][j] = 0;
+    marks.clear();
+    int cell = e_cells[i][1];
+    int a = e[i][1], b = e[i][2];
+    if (e_sign_cell(i, cell) < 0) std::swap(a, b);
+    auto& due = force_workspace.edge_due[i];
+    for (size_t block = 0; block < due.size(); ++block) {
+        if (Time < due[block]) continue;
+        float earliest = std::numeric_limits<float>::infinity();
+        int first = block * pair_block_size + 1, last = std::min(first + pair_block_size - 1, Nv);
+        for (int j = first; j <= last; ++j) if (exist[1][j] && v_cells[j][1] != cell) {
+            if (Time >= ve_next_time[i][j]) assemble_vertex_edge(i, j, a, b, cell, writes);
+            earliest = std::min(earliest, ve_next_time[i][j]);
         }
-//	} 
-	//else if (thread_id == 4) {
-    	    //MAX FORCE
-	   // #pragma omp barrier
-    	   // #pragma omp parallel for num_threads(num_threads_force)
-    	  //  for(int i = 1; i <= Nv; i++) if(exist[1][i]==1){
-            //    float foRce=sqrt(v_F[i][1]*v_F[i][1]+v_F[i][2]*v_F[i][2]);
-              //  if(foRce>Fmax) Fmax=foRce;
-            //}
-	//}
-    
-	//MAX FORCE
-    	#pragma omp barrier
-    	#pragma omp parallel for num_threads(num_threads_force)
-    	for(int i = 1; i <= Nv; i++) if(exist[1][i]==1){
-            float foRce=sqrt(v_F[i][1]*v_F[i][1]+v_F[i][2]*v_F[i][2]);
-            if(foRce>Fmax) Fmax=foRce;
+        due[block] = earliest;
+    }
+}
+
+void assemble_shoulder_row(int i, ContactWrites& writes) {
+    int cell = v_cells[i][1];
+    auto& due = force_workspace.shoulder_due[i];
+    for (size_t block = i / pair_block_size; block < due.size(); ++block) {
+        if (Time < due[block]) continue;
+        float earliest = std::numeric_limits<float>::infinity();
+        int first = block * pair_block_size + 1, last = std::min(first + pair_block_size - 1, Nv);
+        for (int j = std::max(i + 1, first); j <= last; ++j) if (exist[1][j] && v_cells[j][1] != cell) {
+            if (Time >= vv_next_time[i][j]) assemble_shoulder(i, j, cell, v_cells[j][1], writes);
+            earliest = std::min(earliest, vv_next_time[i][j]);
+        }
+        due[block] = earliest;
+    }
+}
+
+void apply_core_contacts(const ContactWrites& writes) {
+    for (const auto& pair : writes.core_contacts) {
+        int a=pair.first, b=pair.second;
+        c_growth[a] = c_growth[b] = 0;
+        if (!c_shrink[a] && c_A0[a] >= 0.5*CV[force_workspace.zone[a]]) {
+            c_A0[a] *= 0.85;
+            c_shrink[a] = 1;
+        }
+        if (!c_shrink[b] && c_A0[b] >= 0.5*CV[force_workspace.zone[b]]) {
+            c_A0[b] /= 0.85;
+            c_shrink[b] = 1;
         }
     }
-
-    return Fmax;
 }
-//****************************************************************************
+
+float calc_forces() {
+    auto& work = force_workspace;
+    work.prepare();
+    float maximum = 0;
+    #pragma omp parallel num_threads(num_threads_force) reduction(max:maximum)
+    {
+        int thread = omp_get_thread_num();
+        int team = omp_get_num_threads();
+        auto& writes = work.contact[thread];
+        writes.prepare(Nv);
+        #pragma omp for schedule(static)
+        for (int i = 1; i <= Nc; ++i) if (exist[3][i]) {
+            work.zone[i] = get_subdomain(i);
+            assemble_area_force(i, work);
+        }
+        #pragma omp for schedule(static) nowait
+        for (int i = 1; i <= Ne; ++i) if (exist[2][i]) assemble_length_force(i, work);
+
+        // Static contiguous row ranges make thread-index order match the
+        // reference's outer loop. Inside each row, j always increases.
+        #pragma omp for schedule(static)
+        for (int i = 1; i <= Ne; ++i) if (exist[2][i]) assemble_edge_row(i, writes);
+        #pragma omp for schedule(static)
+        for (int i = 1; i <= Nv; ++i) if (exist[1][i]) assemble_shoulder_row(i, writes);
+
+        #pragma omp single nowait
+        {
+            wA = wL = wS = 0;
+            for (int i = 1; i <= Nc; ++i) if (exist[3][i]) wA += work.area_energy[i];
+            for (int i = 1; i <= Ne; ++i) if (exist[2][i]) wL += work.length_energy[i];
+            for (int t = 0; t < team; ++t) apply_core_contacts(work.contact[t]);
+        }
+        #pragma omp for schedule(static)
+        for (int i = 1; i <= Nv; ++i) if (exist[1][i]) {
+            float* force = v_F[i];
+            for (const auto& term : work.area_terms[i]) term.add(force);
+            for (int edge : work.incident_edges[i]) work.length_terms[edge][e[edge][2] == i].add(force);
+            for (int t = 0; t < team; ++t)
+                for (const auto& delta : work.contact[t].edge_vertex[i]) delta.add(force);
+            for (int t = 0; t < team; ++t)
+                for (const auto& delta : work.contact[t].shoulder[i]) delta.add(force);
+            float magnitude = sqrt(force[1]*force[1] + force[2]*force[2]);
+            if (magnitude > maximum) maximum = magnitude;
+        }
+    }
+    return maximum;
+}
 void calc_edges(){
 #pragma omp parallel for num_threads(num_threads_calculation)
     for(int i=1; i<=Ne; i++) if(exist[2][i]==1){
@@ -176,7 +207,8 @@ float integrate_motion(double& clock, double deadline, bool decision_mode) {
         vertex_correction(i);
         v_F[i][1] = v_F[i][2] = 0;
     }
-    #pragma omp parallel for num_threads(num_threads_update)
+    // A center can read a vertex that is still awaiting its second correction.
+    // Keep this pass in dev order for walls whose second projection moves it.
     for (int i = 1; i <= Nv; ++i) if (exist[1][i]) {
         vertex_correction(i);
         // Preserve the legacy traversal and its cached centers for CLI frames.

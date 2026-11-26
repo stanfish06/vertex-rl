@@ -50,7 +50,8 @@ float eFg=0;
 float eGamma=0;
 
 //MISC
-int **edge_vertex_int;
+bool force_topology_changed = true;
+int **edge_vertex_int; // indexed by edge, then vertex
 float **ve_next_time;
 float **vv_next_time;
 int Nv, Ne, Nc;
@@ -104,6 +105,7 @@ float boundary_x[2] = {(2*sqrt(2)) * scale_factor, (2*sqrt(2) + 4) * scale_facto
 #include "_cell_division.h"
 #include "_edge.h"
 #include "_output.h"
+#include "_force_workspace.h"
 #include "_force_length.h"
 #include "_force_area.h"
 #include "_force_steric.h"

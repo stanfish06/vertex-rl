@@ -70,6 +70,7 @@ int cell_sides(int nrSides, int *sides, int i){
 }
 //****************************************************************************
 void make_cell(int i){
+    force_topology_changed = true;
 
     //CREATE
     exist[3][i]=1;
