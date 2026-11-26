@@ -5,7 +5,8 @@
 void assemble_length_force(int i, ForceWorkspace& work) {
     int a = e[i][1], b = e[i][2];
     // Dev uses the vertex slot with this edge's index for the tension zone.
-    float ss = EG[get_subdomain(v_cells[i][1])];
+    int owner = training2d.mode ? e_cells[i][1] : v_cells[i][1];
+    float ss = EG[get_subdomain(owner)];
     float c0 = -e_g0*ss/e_length[i];
     float dx = v[b][1] - v[a][1], dy = v[b][2] - v[a][2];
     work.length_terms[i][0] = {-c0*dx, -c0*dy};

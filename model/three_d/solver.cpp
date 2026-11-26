@@ -48,7 +48,8 @@ Solver::Solver(Experiment experiment, unsigned seed, int threads)
     for (const Region& r : regions_) {
         if (!ids.insert(r.zone.id).second) throw std::invalid_argument("duplicate zone ID");
         if (!std::isfinite(r.growth_rate) || r.growth_rate < 0 ||
-            !std::isfinite(r.division_rate) || r.division_rate < 0 || !(r.division_volume > 0)) {
+            !std::isfinite(r.division_rate) || r.division_rate < 0 || !(r.division_volume > 0) ||
+            !(r.target_size > 0) || !std::isfinite(r.death_rate) || r.death_rate < 0) {
             throw std::invalid_argument("invalid zone growth or division settings");
         }
         zones_.push_back(r.zone);
@@ -82,7 +83,7 @@ const Region& Solver::region(int id) const {
     return *std::find_if(regions_.begin(), regions_.end(), [id](const Region& r) { return r.zone.id == id; });
 }
 
-bool Solver::cut(std::vector<Cell>& tissue, int id, Vec3 normal, int& next_id) const {
+bool Solver::cut(std::vector<Cell>& tissue, int id, Vec3 normal, int& next_id, double born) const {
     auto parent = std::find_if(tissue.begin(), tissue.end(), [id](const Cell& c) { return c.id == id; });
     if (parent == tissue.end()) throw std::invalid_argument("unknown cell ID " + std::to_string(id));
     if (!region(parent->zone).allow_division) return false;
@@ -98,6 +99,7 @@ bool Solver::cut(std::vector<Cell>& tissue, int id, Vec3 normal, int& next_id) c
     }
     double total = a.geometry.volume + b.geometry.volume;
     if (std::abs(total - parent->geometry.volume) > 1e-9 * parent->geometry.volume) return false;
+    a.born = b.born = born;
     a.growing = b.growing = parent->growing;
     a.target_volume = parent->target_volume * (a.geometry.volume / total);
     b.target_volume = parent->target_volume - a.target_volume;
@@ -114,7 +116,7 @@ bool Solver::divide(int id, Vec3 normal) {
     if (!std::isfinite(norm(normal)) || !(norm(normal) > 0)) throw std::invalid_argument("invalid plane normal");
     auto proposed = cells_;
     int next = next_id_;
-    if (!cut(proposed, id, normal, next)) return false;
+    if (!cut(proposed, id, normal, next, time_)) return false;
     cells_.swap(proposed);
     next_id_ = next;
     return true;
@@ -148,7 +150,44 @@ std::vector<std::vector<Vec3>> Solver::forces() const {
     return result;
 }
 
-void Solver::advance(double deadline) {
+void Solver::configure(std::vector<Region> regions) {
+    // The driver validates parameter assignments before replacing the list.
+    regions_.swap(regions);
+}
+
+void Solver::policy_step(double deadline, std::vector<Action> actions) {
+    std::sort(actions.begin(), actions.end(), [](const Action& a, const Action& b) { return a.id < b.id; });
+    if (actions.size() != cells_.size()) throw std::invalid_argument("expected exactly one action per live cell");
+    for (size_t i = 0; i < cells_.size(); ++i) {
+        if (cells_[i].id != actions[i].id) throw std::invalid_argument("missing, duplicate or unknown action ID");
+    }
+    auto proposed = cells_;
+    int next = next_id_;
+    for (const auto& action : actions) {
+        auto cell = std::lower_bound(proposed.begin(), proposed.end(), action.id,
+            [](const Cell& c, int id) { return c.id < id; });
+        const Region& r = region(cell->zone);
+        switch (action.fate) {
+        case Fate::grow: if (r.allow_growth) cell->growing = true; break;
+        case Fate::stop: if (r.allow_stop) cell->growing = false; break;
+        case Fate::divide: cut(proposed, cell->id, action.normal, next, time_); break;
+        case Fate::die: if (r.allow_death) proposed.erase(cell); break;
+        }
+    }
+    double start = time_;
+    std::swap(next_id_, next);
+    cells_.swap(proposed);
+    try { advance(deadline, false); }
+    catch (...) {
+        if (time_ == start) {
+            cells_.swap(proposed);
+            next_id_ = next;
+        }
+        throw;
+    }
+}
+
+void Solver::advance(double deadline, bool builtin_fates) {
     if (!std::isfinite(deadline) || deadline <= time_) throw std::invalid_argument("deadline must be later than time");
     while (time_ < deadline && !cells_.empty()) {
         auto force = forces();
@@ -194,10 +233,18 @@ void Solver::advance(double deadline) {
         auto rng = random_;
         int next = next_id_;
         std::vector<std::pair<int, Vec3>> divisions;
+        std::vector<int> deaths;
         for (auto& cell : proposed) {
             const Region& r = region(cell.zone);
-            if (cell.growing && r.allow_growth) cell.target_volume += r.growth_rate * dt;
+            if (cell.growing && r.allow_growth && cell.target_volume < r.target_size) {
+                cell.target_volume = std::min(r.target_size, cell.target_volume + r.growth_rate * dt);
+            }
             if (!std::isfinite(cell.target_volume)) throw std::runtime_error("growth produced a nonfinite target");
+            if (!builtin_fates) continue;
+            if (r.allow_death && r.death_rate > 0 && uniform(rng) < -std::expm1(-r.death_rate*dt)) {
+                deaths.push_back(cell.id);
+                continue;
+            }
             if (r.allow_division && r.division_rate > 0 && cell.geometry.volume >= r.division_volume &&
                 uniform(rng) < -std::expm1(-r.division_rate*dt)) {
                 double z = 2*uniform(rng)-1, phi = 2*std::acos(-1.)*uniform(rng);
@@ -205,7 +252,10 @@ void Solver::advance(double deadline) {
                 divisions.emplace_back(cell.id, Vec3{radius*std::cos(phi), radius*std::sin(phi), z});
             }
         }
-        for (const auto& d : divisions) cut(proposed, d.first, d.second, next);
+        if (!deaths.empty()) proposed.erase(std::remove_if(proposed.begin(), proposed.end(), [&](const Cell& c) {
+            return std::binary_search(deaths.begin(), deaths.end(), c.id);
+        }), proposed.end());
+        for (const auto& d : divisions) cut(proposed, d.first, d.second, next, time_ + dt);
         cells_.swap(proposed);
         random_ = rng;
         next_id_ = next;

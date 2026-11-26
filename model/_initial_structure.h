@@ -197,6 +197,11 @@ int read_and_set_domain() {
             tangents.size() != vertices.size()) {
             throw std::runtime_error("domain needs matching vertex, normal and tangent rows");
         }
+        if (training2d.mode && training2d.zones.front().rule) {
+            Ring outline;
+            for (auto p : vertices) outline.push_back({p[0],p[1]});
+            if (!simple_ring(outline)) throw std::runtime_error("domain must be a simple closed polygon");
+        }
         release_rows(v_D);
         release_rows(e_D);
         release_rows(e_normal_unit_vector);
@@ -267,11 +272,18 @@ void set_initial_singleCell(){
 	    max_y = y;
 	}
     } 
+    if (training2d.mode && training2d.zones.front().rule) {
+        min_x=max_x=v_D[1][1]; min_y=max_y=v_D[1][2];
+        for (int i=2; i<=v_D[0][0]; ++i) {
+            min_x=std::min(min_x,v_D[i][1]); max_x=std::max(max_x,v_D[i][1]);
+            min_y=std::min(min_y,v_D[i][2]); max_y=std::max(max_y,v_D[i][2]);
+        }
+    }
     // sampling box
     //float width = scale_factor * (4*sqrt(2) + 4);
     //float height = scale_factor * (14 + 4*sqrt(2));
-    float width = max_x;
-    float height = max_y; 
+    float width = max_x - min_x;
+    float height = max_y - min_y;
     // number of random samples
     srand(placement_seed);
     int nrC_try =20;
@@ -309,8 +321,8 @@ void set_initial_singleCell(){
     */
     
     for(int n = 1; n <= nrC_try; n++) {
-        float c_x = rnd() * width;
-        float c_y = rnd() * height;
+        float c_x = min_x + rnd() * width;
+        float c_y = min_y + rnd() * height;
 	//c_x = 32.860644;
 	//c_y =	5.582756;
 //	c_y = 3.186068;

@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <stdexcept>
 
 namespace vertex3d {
@@ -29,6 +30,7 @@ class Session {
     Collection collection_;
     double limit_=0;
     bool failed_=false;
+    std::string mode_;
 
     const char* phase() const {
         if (failed_) return "solver_error";
@@ -37,7 +39,7 @@ class Session {
         return "ok";
     }
     Json report() const {
-        auto result=state(*solver_);
+        auto result=state(*solver_,!mode_.empty());
         json_object_object_add(result.get(),"status",json_object_new_string(phase()));
         return result;
     }
@@ -56,7 +58,9 @@ public:
             return status(op=="ping" ? "ready" : "closed");
         }
         if (op=="reset") {
-            keys(request,{"op","seed","time_limit","experiment"});
+            keys(request,{"op","seed","time_limit","experiment","mode","zones"});
+            std::string mode = field(request,"mode",false) ? string(field(request,"mode")) : "";
+            if (field(request,"mode",false) && mode!="cell" && mode!="tissue") throw std::invalid_argument("invalid mode");
             unsigned seed=seed_value(field(request,"seed"));
             double limit=number(field(request,"time_limit"));
             if (!(limit>0)) throw std::invalid_argument("time_limit must be positive");
@@ -67,7 +71,10 @@ public:
                 Path path=string(spec);
                 file=read_json(path); spec=file.get(); base=path.parent_path();
             }
-            auto next=std::make_unique<Solver>(experiment(spec,base),seed,threads_);
+            auto config = experiment(spec,base);
+            if (auto* zones=field(request,"zones",false)) zone_overrides(config.regions,zones);
+            auto next=std::make_unique<Solver>(std::move(config),seed,threads_);
+            mode_=mode;
             solver_=std::move(next);
             limit_=limit;
             failed_=false;
@@ -88,18 +95,36 @@ public:
         if (op=="divide") {
             keys(request,{"op","cell_id","normal"});
             active();
+            if (!mode_.empty()) throw std::invalid_argument("training actions must use step");
             bool accepted=solver_->divide(integer(field(request,"cell_id"),1),vector3(field(request,"normal")));
             auto result=report();
             json_object_object_add(result.get(),"division_accepted",json_object_new_boolean(accepted));
             return result;
         }
         if (op!="step") throw std::invalid_argument("unknown operation " + op);
-        keys(request,{"op","deadline"});
+        if (mode_=="cell") keys(request,{"op","deadline","actions"});
+        else if (mode_=="tissue") keys(request,{"op","deadline","controls"});
+        else keys(request,{"op","deadline"});
         active();
         double deadline=number(field(request,"deadline"));
         if (deadline<=solver_->time()) throw std::invalid_argument("deadline must be later than time");
+        auto actions = mode_=="cell" ? cell_actions(field(request,"actions")) : std::vector<Action>{};
+        if (mode_=="cell") {
+            std::set<int> ids;
+            for (const auto& a : actions) ids.insert(a.id);
+            if (ids.size()!=actions.size() || ids.size()!=solver_->cells().size() ||
+                !std::all_of(solver_->cells().begin(),solver_->cells().end(),[&](const Cell& c){return ids.count(c.id);})) {
+                throw std::invalid_argument("expected exactly one action per live cell");
+            }
+        }
+        if (auto* assignments=field(request,"controls",false)) {
+            auto regions = solver_->regions();
+            controls(regions,assignments);
+            solver_->configure(std::move(regions));
+        }
         try {
-            solver_->advance(std::min(deadline,limit_));
+            if (mode_=="cell") solver_->policy_step(std::min(deadline,limit_),std::move(actions));
+            else solver_->advance(std::min(deadline,limit_));
         } catch (const std::exception& failure) {
             failed_=true;
             auto result=report();

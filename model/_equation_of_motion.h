@@ -36,6 +36,7 @@ void assemble_shoulder_row(int i, ContactWrites& writes) {
 }
 
 void apply_core_contacts(const ContactWrites& writes) {
+    if (training2d.mode == 2) return;
     for (const auto& pair : writes.core_contacts) {
         int a=pair.first, b=pair.second;
         c_growth[a] = c_growth[b] = 0;

@@ -12,6 +12,8 @@ struct Cell2D {
     int id, zone, dead, growing;
     float x, y, area, target_area;
     std::vector<BoundaryVertex> vertices;
+    int agent_id = 0;
+    double age = 0;
 };
 
 struct Tissue2D {
@@ -24,6 +26,11 @@ Tissue2D measure_tissue(double time) {
     for (int i = 1; i <= Nc; ++i) if (exist[3][i]) {
         Cell2D cell{i, get_subdomain(i), c_dead[i], c_growth[i],
                     c_center[i][1], c_center[i][2], c_area[i], c_A0[i], {}};
+        if (training2d.mode) {
+            cell.zone = trained_zone(i);
+            cell.agent_id = training2d.agents[i];
+            cell.age = time-training2d.born[i];
+        }
         cell.vertices.reserve(c_vertices[i][0]);
         for (int j = 1; j <= c_vertices[i][0]; ++j) {
             int id = c_vertices[i][j];

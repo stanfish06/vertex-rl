@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import sys
 
+import worker_controls as policy
+
 
 def number(value, name):
     if type(value) not in (int, float) or not math.isfinite(value):
@@ -27,10 +29,18 @@ class Worker:
         names = ctypes.POINTER(ctypes.c_char_p)
         values = ctypes.POINTER(ctypes.c_double)
         self.lib.vertex2d_reset.argtypes = (ctypes.c_uint, ctypes.c_int, ctypes.c_int, names, values)
+        self.lib.vertex2d_reset_training.argtypes = (*self.lib.vertex2d_reset.argtypes, ctypes.c_int, ctypes.c_int,
+                                                      ctypes.POINTER(policy.ZoneSpec))
+        ints = ctypes.POINTER(ctypes.c_int)
+        self.lib.vertex2d_actions.argtypes = (ctypes.c_int, ints, ints, values)
+        self.lib.vertex2d_control.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_double)
+        self.lib.vertex2d_control.restype = None
         self.lib.vertex2d_advance.argtypes = (ctypes.c_double,)
         self.lib.vertex2d_export.argtypes = (ctypes.c_int,)
         self.lib.vertex2d_error.restype = self.lib.vertex2d_measure.restype = ctypes.c_char_p
         self.status = "uninitialized"
+        self.mode = None
+        self.live = set()
         self.limit = 0
         self.time = 0
 
@@ -53,18 +63,27 @@ class Worker:
         n = len(parameters)
         names = (ctypes.c_char_p * n)(*(key.encode() for key in parameters))
         values = (ctypes.c_double * n)(*(number(v, k) for k, v in parameters.items()))
-        result = self.lib.vertex2d_reset(seed, self.threads, n, names, values)
+        mode = request.get("mode")
+        if "mode" in request and mode not in ("tissue", "cell"):
+            raise ValueError("invalid training mode")
+        if not mode and "zones" in request:
+            raise ValueError("zones require a training mode")
+        ids, specs = policy.zones_config(request.get("zones", []))
+        result = self.lib.vertex2d_reset_training(seed, self.threads, n, names, values,
+                                                  (None, "tissue", "cell").index(mode), len(ids), specs)
         if result == -2:
             raise ValueError(self.error())
         if result:
             self.status = "uninitialized"
             raise ValueError(self.error())
+        self.mode, self.zones = mode, ids
         self.limit = limit
         return self.reply_state()
 
     def reply_state(self, failure=False):
         state = self.state()
         self.time = state["time"]
+        self.live = {c["id"] for c in state["cells"] if not c["dead"]}
         if failure:
             self.status = "solver_error"
             state["message"] = self.error()
@@ -81,7 +100,8 @@ class Worker:
             raise ValueError("request must be an object")
         op = request["op"]
         allowed = {"ping": (), "close": (), "measure": (), "export": ("frame_id",),
-                   "reset": ("seed", "time_limit", "parameters"), "step": ("deadline",)}
+                   "reset": ("seed", "time_limit", "parameters", "mode", "zones"),
+                   "step": {"cell": ("deadline", "actions"), "tissue": ("deadline", "controls")}.get(self.mode, ("deadline",))}
         if not isinstance(op, str) or op not in allowed:
             raise ValueError("unknown operation")
         extra = request.keys() - {"op", *allowed[op]}
@@ -108,7 +128,18 @@ class Worker:
         deadline = number(request["deadline"], "deadline")
         if deadline <= self.time:
             raise ValueError("deadline must be later than the current time")
-        failed = self.lib.vertex2d_advance(min(self.limit, deadline))
+        failed = False
+        if self.mode == "cell":
+            rows = policy.actions(request["actions"], self.live)
+            integers = ctypes.c_int * len(rows)
+            angles = ctypes.c_double * len(rows)
+            failed = self.lib.vertex2d_actions(len(rows), integers(*(r[0] for r in rows)),
+                                               integers(*(r[1] for r in rows)), angles(*(r[2] for r in rows)))
+        elif self.mode == "tissue":
+            for assignment in policy.controls(request.get("controls", []), self.zones):
+                self.lib.vertex2d_control(*assignment)
+        if not failed:
+            failed = self.lib.vertex2d_advance(min(self.limit, deadline))
         return self.reply_state(failure=bool(failed))
 
 
@@ -131,7 +162,7 @@ def main():
         for line in sys.stdin:
             try:
                 reply = worker.handle(json.loads(line))
-            except (ValueError, KeyError, OSError, OverflowError) as error:
+            except (ValueError, KeyError, TypeError, OSError, OverflowError) as error:
                 reply = {"status": "error", "message": str(error)}
             print(json.dumps(reply, allow_nan=False, separators=(",", ":")), file=replies, flush=True)
             if reply["status"] == "closed":

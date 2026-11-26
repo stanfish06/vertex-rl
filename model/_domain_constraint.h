@@ -43,6 +43,14 @@ void vertex_correction(int vertex_id) {
 }
 */
 void vertex_correction(int vertex_id) {
+    if (training2d.mode && !training2d.zones.empty() && training2d.zones.front().rule) {
+        auto wall = wall_distance({v[vertex_id][1],v[vertex_id][2]});
+        if (!wall.inside) {
+            v[vertex_id][1] = wall.closest[0];
+            v[vertex_id][2] = wall.closest[1];
+        }
+        return;
+    }
     float v_x = v[vertex_id][1]; float v_y = v[vertex_id][2];
     //printf("x: %f\n", v_x);
     //printf("y: %f\n", v_y);
@@ -135,6 +143,10 @@ bool in_domain_some_distance_to_edge(float x, float y) {
 }
 */
 bool in_domain_some_distance_to_edge(float x, float y) {
+    if (training2d.mode && !training2d.zones.empty() && training2d.zones.front().rule) {
+        auto wall = wall_distance({x,y});
+        return wall.inside && wall.squared>=1;
+    }
     printf("Point %f, %f\n", x, y);
     for (int j = 1; j <= e_D[0][0]; j++) {
         float u_n_x = e_normal_unit_vector[j][1];

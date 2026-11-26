@@ -1,6 +1,7 @@
 """Integration tests for the compiled 2D solver and its persistent worker."""
 import csv
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -62,6 +63,81 @@ class WorkerTests(unittest.TestCase):
         self.addCleanup(client.close)
         self.assertEqual(client.call("ping"), {"status": "ready"})
         return client
+
+    def test_training_cut_and_lifetime(self):
+        reset = dict(seed=646, time_limit=1, mode="cell",
+                     zones=[{"id":17, "rule":{"kind":"all"}, "allow_death":True, "growth_rate":0}])
+        state = self.worker.call("reset", **reset)
+        before = state["cells"]
+        ids = [cell["id"] for cell in before]
+        invalid = [{"id":i,"action":"die"} for i in ids[:-1]]
+        self.assertEqual(self.worker.call("step",deadline=0.01,actions=invalid)["status"],"error")
+        self.assertEqual(self.worker.call("measure"),state)
+        grow = [{"id":i,"action":"grow"} for i in ids]
+        grown = self.worker.call("step", deadline=0.001, actions=grow)
+        self.assertTrue(all(c["growing"] for c in grown["cells"]))
+        actions = [{"id":ids[0], "action":"divide", "orientation":0.345},
+                   *[{"id":i,"action":"stop_growing"} for i in ids[1:]]]
+        split = self.worker.call("step", deadline=0.001001, actions=actions)
+        self.assertEqual(split["status"],"ok")
+        daughters = [c for c in split["cells"] if c["id"]>max(ids)]
+        self.assertEqual({c["id"] for c in daughters},{max(ids)+1,max(ids)+2})
+        self.assertTrue(all(c["zone"]==17 and c["growing"] for c in daughters))
+        self.assertTrue(all(abs(c["age"]-0.000001)<1e-13 for c in daughters))
+        self.assertAlmostEqual(sum(c["target_area"] for c in daughters),grown["cells"][0]["target_area"],places=6)
+        self.assertAlmostEqual(daughters[0]["target_area"]/daughters[1]["target_area"],
+                               daughters[0]["area"]/daughters[1]["area"],places=3)
+        self.assertEqual(self.worker.call("step", deadline=0.01, actions=actions)["status"],"error")
+        deaths = [{"id":c["id"],"action":"die"} for c in split["cells"]]
+        ended = self.worker.call("step", deadline=0.01, actions=deaths)
+        self.assertEqual((ended["status"],ended["time"],ended["cells"]),("terminated",split["time"],[]))
+        self.assertEqual(self.worker.call("reset",**reset),state)
+
+    def test_training_control_atomicity_and_permissions(self):
+        z = {"id":27,"rule":{"kind":"all"},"allow_division":False,"allow_death":False}
+        reset = dict(seed=646,time_limit=1,zones=[z])
+        start = self.worker.call("reset",mode="tissue",**reset)
+        def control(name,value):
+            return {"zone":27,"parameter":name,"value":value}
+        bad = [control("growth_rate",0),control("kA",1)]
+        self.assertEqual(self.worker.call("step",deadline=0.001,controls=bad)["status"],"error")
+        self.assertEqual(self.worker.call("measure"),start)
+        repeated = [control("growth_rate",2),control("target_size",4)]
+        a=self.worker.call("step",deadline=0.001,controls=repeated)
+        b=self.worker.call("step",deadline=0.002,controls=repeated)
+        self.assertGreater(b["cells"][0]["target_area"],a["cells"][0]["target_area"])
+        self.assertGreater(a["cells"][0]["target_area"],start["cells"][0]["target_area"])
+        start=self.worker.call("reset",mode="cell",**reset)
+        actions=[{"id":c["id"],"action":"divide","orientation":.1} for c in start["cells"]]
+        unchanged=self.worker.call("step",deadline=0.001,actions=actions)
+        self.assertEqual([c["id"] for c in unchanged["cells"]],[c["id"] for c in start["cells"]])
+        self.assertFalse(any(c["growing"] for c in unchanged["cells"]))
+
+    def test_early_divisions_in_translated_ellipse(self):
+        # Three sub-threshold cuts produce daughters narrower than the contact shell.
+        # Far edges across a disjoint neighbor must not generate penetration impulses.
+        for cx, cy in ((0,0),(50,40)):
+            with self.subTest(center=(cx,cy)):
+                points=[(cx+24*math.cos(k*math.tau/64),cy+17*math.sin(k*math.tau/64)) for k in range(64)]
+                sides=list(zip(points,points[1:]+points[:1]))
+                tangents=[((b[0]-a[0])/math.dist(a,b),(b[1]-a[1])/math.dist(a,b)) for a,b in sides]
+                for name,values in (("domain_coords",points),("domain_v_ts",tangents),
+                                    ("domain_v_ns",[(-y,x) for x,y in tangents])):
+                    (self.directory/"initial"/(name+".txt")).write_text("".join(f"{x},{y}\n" for x,y in values))
+                state=self.worker.call("reset",seed=2,time_limit=.02,mode="cell",
+                                       zones=[{"id":0,"rule":{"kind":"all"},"growth_rate":0.1}])
+                angles={7:-.594327894,8:1.538350895,13:-.277104725}
+                actions=[]
+                for c in state["cells"]:
+                    i=c["id"]
+                    if i in angles:
+                        actions.append({"id":i,"action":"divide","orientation":angles[i]})
+                    else:
+                        actions.append({"id":i,"action":"die" if i in (9,11,12) else "grow"})
+                final=self.worker.call("step",deadline=.02,actions=actions)
+                self.assertEqual(final["status"],"truncated",final.get("message"))
+                self.assertFalse(set(angles)&{c["id"] for c in final["cells"]})
+                self.assertTrue(all(c["area"]>0.04 for c in final["cells"]))
 
     def test_deadline_motion_and_export(self):
         reset = self.worker.call("reset", seed=646, time_limit=0.01)

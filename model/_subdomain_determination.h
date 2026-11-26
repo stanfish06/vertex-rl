@@ -63,5 +63,14 @@ int zone_at(float c_x, float c_y) {
 }
 
 int get_subdomain(int cell_id) {
+    if (training2d.mode && !training2d.zones.empty() && training2d.zones.front().rule) {
+        PlanarPoint center{c_center[cell_id][1],c_center[cell_id][2]};
+        for (const auto& z : training2d.zones) if (zone_matches(z,center)) {
+            // Custom zone IDs outside the legacy material table use its base material.
+            return z.id < 5 ? z.id : 0;
+        }
+        // The serial observation check reports an uncovered center.
+        return 0;
+    }
     return zone_at(c_center[cell_id][1], c_center[cell_id][2]);
 }

@@ -25,7 +25,13 @@ struct Region {
     double growth_rate = 0.0;     // target volume per unit time
     double division_volume = std::numeric_limits<double>::infinity();
     double division_rate = 0.0;   // hazard per unit time after reaching division_volume
+    double target_size = std::numeric_limits<double>::infinity();
+    double death_rate = 0;
+    bool allow_death = true, allow_stop = true;
 };
+
+enum class Fate { grow, stop, divide, die };
+struct Action { int id; Fate fate; Vec3 normal{}; };
 
 struct Cell {
     int id = 0;
@@ -34,6 +40,7 @@ struct Cell {
     bool growing = true;
     int zone = 0;
     Measures geometry{};
+    double born = 0;
 };
 
 struct Experiment {
@@ -46,7 +53,9 @@ struct Experiment {
 class Solver {
 public:
     Solver(Experiment experiment, unsigned seed, int threads);
-    void advance(double deadline);
+    void advance(double deadline, bool builtin_fates = true);
+    void policy_step(double deadline, std::vector<Action> actions);
+    void configure(std::vector<Region> regions);
     bool divide(int cell_id, Vec3 normal);
     const std::vector<Cell>& cells() const { return cells_; }
     const std::vector<Region>& regions() const { return regions_; }
@@ -66,7 +75,7 @@ private:
     std::uint64_t retries_ = 0, accepted_ = 0;
     void measure_cell(Cell& cell) const;
     const Region& region(int id) const;
-    bool cut(std::vector<Cell>& tissue, int id, Vec3 normal, int& next_id) const;
+    bool cut(std::vector<Cell>& tissue, int id, Vec3 normal, int& next_id, double born) const;
     std::vector<std::vector<Vec3>> forces() const;
 };
 }

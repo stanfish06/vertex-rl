@@ -45,6 +45,33 @@ class Solver3DTests(unittest.TestCase):
         self.assertEqual(replies[0], {"status": "ready"})
         return replies[1:]
 
+    def test_native_training_modes(self):
+        reset=dict(op="reset",mode="cell",seed=646,time_limit=.1,experiment=self.cube,
+                   zones=[{"id":10,"allow_death":False},{"id":20,"allow_death":True}])
+        step=lambda t,actions: dict(op="step",deadline=t,actions=actions)
+        stop={"id":1,"action":"stop_growing"}
+        divide={"id":1,"action":"divide","orientation":[1,0,0]}
+        _, start, invalid, stopped, cut, died = self.replies(self.cube,reset,step(.001,[stop,stop]),
+            step(.001,[stop]),step(.002,[divide]),
+            step(.003,[{"id":2,"action":"die"},{"id":3,"action":"die"}]))
+        self.assertEqual(invalid["status"],"error")
+        self.assertFalse(stopped["cells"][0]["growing"])
+        self.assertEqual([c["id"] for c in cut["cells"]],[2,3])
+        self.assertTrue(all(not c["growing"] and c["age"]==.001 for c in cut["cells"]))
+        self.assertAlmostEqual(sum(c["target_volume"] for c in cut["cells"]),stopped["cells"][0]["target_volume"])
+        self.assertEqual([c["id"] for c in died["cells"]],[2])
+        control=lambda name,value: {"parameter":name,"zone":10,"value":value}
+        settings=[control("growth_rate",1),control("target_size",2)]
+        reset.update(mode="tissue")
+        _, initial, invalid, untouched, first, second = self.replies(self.cube,reset,
+            dict(op="step",deadline=.02,controls=[*settings,control("pressure",3)]),
+            dict(op="measure"),dict(op="step",deadline=.02,controls=settings),
+            dict(op="step",deadline=.04,controls=settings))
+        self.assertEqual(invalid["status"],"error")
+        self.assertEqual(untouched,initial)
+        self.assertAlmostEqual(first["cells"][0]["target_volume"],1.02)
+        self.assertAlmostEqual(second["cells"][0]["target_volume"],1.04)
+
     def test_cube_collection(self):
         output = self.directory / "frames"
         subprocess.run([self.binary, "run", CUBE, output, "--threads", "2"], check=True, capture_output=True)

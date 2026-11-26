@@ -4,6 +4,7 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <set>
 #include <stdexcept>
 
 namespace vertex3d {
@@ -163,6 +164,78 @@ static Zone zone(json_object* spec, int id, const Path& base) {
     throw std::invalid_argument("unknown zone rule " + kind);
 }
 
+static void zone_settings(Region& r, json_object* z) {
+    r.allow_growth = flag(z,"allow_growth",r.allow_growth);
+    r.allow_stop = flag(z,"allow_stop",r.allow_stop);
+    r.allow_death = flag(z,"allow_death",r.allow_death);
+    r.allow_division = flag(z,"allow_division",r.allow_division);
+    r.growth_rate = setting(z,"growth_rate",r.growth_rate);
+    r.target_size = setting(z,"target_size",r.target_size);
+    r.death_rate = setting(z,"death_rate",r.death_rate);
+    r.division_volume = setting(z,"division_volume",r.division_volume);
+    r.division_rate = setting(z,"division_rate",r.division_rate);
+}
+
+static Region& region_by_id(std::vector<Region>& regions, int id) {
+    auto r = std::find_if(regions.begin(), regions.end(), [id](const Region& r){ return r.zone.id == id; });
+    if (r == regions.end()) throw std::invalid_argument("unknown zone " + std::to_string(id));
+    return *r;
+}
+
+void zone_overrides(std::vector<Region>& regions, json_object* array) {
+    if (regions.empty()) regions.push_back({Zone{0, [](Vec3) { return true; }}});
+    std::set<int> seen;
+    for (size_t i=0; i<count(array); ++i) {
+        auto* z = json_object_array_get_idx(array,i);
+        keys(z,{"id","allow_growth","allow_stop","allow_death","allow_division","growth_rate","target_size",
+                "division_rate","division_volume","death_rate"});
+        int id = integer(field(z,"id"));
+        if (!seen.insert(id).second) throw std::invalid_argument("duplicate zone");
+        zone_settings(region_by_id(regions,id),z);
+    }
+}
+
+void controls(std::vector<Region>& regions, json_object* array) {
+    std::set<std::pair<int,std::string>> seen;
+    for (size_t i=0; i<count(array); ++i) {
+        auto* control = json_object_array_get_idx(array,i);
+        keys(control,{"zone","parameter","value"});
+        int id = integer(field(control,"zone"));
+        auto& r = region_by_id(regions,id);
+        auto name = string(field(control,"parameter"));
+        if (!seen.emplace(id,name).second) throw std::invalid_argument("duplicate control " + name);
+        double value = number(field(control,"value"));
+        if (value < 0 || (name == "target_size" && value == 0)) throw std::invalid_argument("invalid " + name);
+        if (name == "growth_rate") r.growth_rate = value;
+        else if (name == "target_size") r.target_size = value;
+        else if (name == "division_rate") r.division_rate = value;
+        else if (name == "death_rate") r.death_rate = value;
+        else throw std::invalid_argument("unknown control " + name);
+    }
+}
+
+std::vector<Action> cell_actions(json_object* array) {
+    std::vector<Action> result;
+    for (size_t i=0; i<count(array); ++i) {
+        auto* a = json_object_array_get_idx(array,i);
+        int id = integer(field(a,"id"),1);
+        auto name = string(field(a,"action"));
+        if (name == "divide") {
+            keys(a,{"id","action","orientation"});
+            Vec3 normal = vector3(field(a,"orientation"));
+            if (!(norm(normal)>0) || !std::isfinite(norm(normal))) throw std::invalid_argument("invalid plane normal");
+            result.push_back({id,Fate::divide,normal});
+        } else {
+            keys(a,{"id","action"});
+            if (name == "grow") result.push_back({id,Fate::grow});
+            else if (name == "stop_growing") result.push_back({id,Fate::stop});
+            else if (name == "die") result.push_back({id,Fate::die});
+            else throw std::invalid_argument("unknown fate " + name);
+        }
+    }
+    return result;
+}
+
 Experiment experiment(json_object* object, const Path& base) {
     keys(object,{"domain","cells","zones","mechanics","seed","time_limit","output_interval","divisions"});
     Experiment result;
@@ -183,13 +256,10 @@ Experiment experiment(json_object* object, const Path& base) {
     if (auto* zones = field(object,"zones",false)) {
         for (size_t i=0; i<count(zones); ++i) {
             auto* z = json_object_array_get_idx(zones,i);
-            keys(z,{"id","rule","allow_growth","allow_division","growth_rate","division_volume","division_rate"});
+            keys(z,{"id","rule","allow_growth","allow_division","growth_rate","division_volume","division_rate",
+                    "allow_stop","allow_death","death_rate","target_size"});
             Region r{zone(field(z,"rule"), integer(field(z,"id")), base)};
-            r.allow_growth = flag(z,"allow_growth",true);
-            r.allow_division = flag(z,"allow_division",true);
-            r.growth_rate = setting(z,"growth_rate",r.growth_rate);
-            r.division_volume = setting(z,"division_volume",r.division_volume);
-            r.division_rate = setting(z,"division_rate",r.division_rate);
+            zone_settings(r,z);
             result.regions.push_back(std::move(r));
         }
     }
@@ -215,7 +285,7 @@ static json_object* point(Vec3 p) {
     return a;
 }
 
-Json state(const Solver& solver) {
+Json state(const Solver& solver, bool training) {
     Json result(json_object_new_object(),json_object_put);
     json_object_object_add(result.get(),"time",json_object_new_double(solver.time()));
     auto* cells = json_object_new_array();
@@ -229,6 +299,7 @@ Json state(const Solver& solver) {
         json_object_array_add(cells,obj);
         json_object_object_add(obj,"id",json_object_new_int(c.id));
         json_object_object_add(obj,"zone",json_object_new_int(c.zone));
+        if (training) json_object_object_add(obj,"age",json_object_new_double(solver.time()-c.born));
         json_object_object_add(obj,"growing",json_object_new_boolean(c.growing));
         json_object_object_add(obj,"center",point(c.geometry.centroid));
         json_object_object_add(obj,"volume",json_object_new_double(c.geometry.volume));
