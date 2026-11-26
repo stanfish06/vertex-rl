@@ -124,6 +124,23 @@ void embedded(const Mesh& m,double eps) {
             std::vector<Vec3> shared;
             for (int k: m.faces[a])
                 for (int l: m.faces[b]) if (k==l) shared.push_back(m.vertices[k]-origin);
+            // If the off-edge vertices lie strictly on one side of the
+            // other face, the triangles can meet only on their shared feature.
+            // Testing the plane distances of shared vertices numerically can
+            // manufacture an intersection near an almost parallel incident edge.
+            auto on_one_side=[&](Face face,const Triangle& t,Face other,const Triangle& plane) {
+                Vec3 n=unit(cross(plane[1]-plane[0],plane[2]-plane[0]));
+                bool positive=true, negative=true;
+                for (int k=0;k<3;++k) {
+                    if (std::find(other.begin(),other.end(),face[k])!=other.end()) continue;
+                    double d=dot(t[k]-plane[0],n);
+                    positive=positive && d>eps;
+                    negative=negative && d< -eps;
+                }
+                return positive || negative;
+            };
+            if (!shared.empty() && shared.size()<3 &&
+                (on_one_side(m.faces[a],ta,m.faces[b],tb) || on_one_side(m.faces[b],tb,m.faces[a],ta))) continue;
             auto unexpected=[&](Vec3 p) {
                 if (shared.empty()) return true;
                 auto d=p-shared[0];
@@ -275,6 +292,42 @@ void triangulate(const std::vector<Vec3>& vertices,std::vector<int> polygon,std:
     faces.push_back({polygon[0],polygon[1],polygon[2]});
 }
 
+// An ear-clipped cap can put three nearly collinear section vertices in one
+// triangle where a cut crosses a slightly deformed flat side. Improve the
+// smallest angle across each interior diagonal, keeping every boundary edge.
+void improve_cap(const std::vector<Vec3>& vertices,std::vector<Face>& faces,Vec3 normal) {
+    auto quality=[&](Face f) {
+        Vec3 a=vertices[f[1]]-vertices[f[0]], b=vertices[f[2]]-vertices[f[0]];
+        double area=dot(cross(a,b),normal);
+        std::array<double,3> lengths{norm(a),norm(b),norm(a-b)};
+        std::sort(lengths.begin(),lengths.end());
+        // Signed sine of the smallest angle. A nonpositive value prevents a
+        // flip across a concave quadrilateral or a degenerate diagonal.
+        return area/(lengths[1]*lengths[2]);
+    };
+    while (true) {
+        // Each map entry is the first triangle traversing an undirected edge.
+        std::map<Edge,std::pair<int,int>> incident;
+        bool flipped=false;
+        for (int i=0;i<int(faces.size()) && !flipped;++i) {
+            Face f=faces[i];
+            for (int k=0;k<3;++k) {
+                int a=f[k], b=f[(k+1)%3], c=f[(k+2)%3];
+                auto [it,first]=incident.emplace(edge(a,b),std::make_pair(i,c));
+                if (first) continue;
+                auto [j,d]=it->second;
+                Face left{c,d,b}, right{d,c,a};
+                double before=std::min(quality(f),quality(faces[j]));
+                double after=std::min(quality(left),quality(right));
+                if (after<=before+roundoff) continue;
+                faces[i]=left; faces[j]=right;
+                flipped=true; break;
+            }
+        }
+        if (!flipped) return;
+    }
+}
+
 Mesh compact(const std::vector<Vec3>& vertices,std::vector<Face> faces) {
     Mesh m;
     std::map<int,int> ids;
@@ -360,6 +413,7 @@ std::pair<Mesh,Mesh> split(const Mesh& parent,Vec3 point,Vec3 normal) {
         auto first=cap.front();
         require(dot(cross(vertices[first[1]]-vertices[first[0]],vertices[first[2]]-vertices[first[0]]),n)>0,
                 "division section has a hole and cannot form a simple cap");
+        improve_cap(vertices,cap,n);
         for (auto f:cap) {
             sides[0].push_back(f);
             sides[1].push_back({f[2],f[1],f[0]});
