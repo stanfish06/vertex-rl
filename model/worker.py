@@ -114,11 +114,15 @@ class Worker:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("library", type=Path)
+    parser.add_argument("library", type=Path, help="native 2D library or 3D executable")
+    parser.add_argument("--dimension", type=int, choices=(2, 3), default=2)
     parser.add_argument("--threads", type=int, default=1, help="solver thread count, retained on reset")
     args = parser.parse_args()
     if not 1 <= args.threads <= 2**31 - 1:
         parser.error("--threads must be a positive integer in the native int range")
+    if args.dimension == 3:
+        binary = str(args.library.resolve())
+        os.execv(binary, [binary, "worker", "--threads", str(args.threads)])
     # Legacy native routines print diagnostics to fd 1. Reserve the original
     # stdout pipe exclusively for complete protocol replies.
     with os.fdopen(os.dup(sys.stdout.fileno()), "w", encoding="utf-8") as replies:

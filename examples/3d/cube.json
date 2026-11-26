@@ -1,0 +1,15 @@
+{
+  "seed": 646,
+  "time_limit": 0.1,
+  "output_interval": 0.05,
+  "domain": {"shape": "box", "min": [-2, -2, -2], "max": [2, 2, 2]},
+  "cells": [
+    {"mesh": {"shape": "box", "min": [-0.5, -0.5, -0.5], "max": [0.5, 0.5, 0.5]}}
+  ],
+  "zones": [
+    {"id": 10, "rule": {"kind": "layer", "origin": [0, 0, 0], "axis": [1, 0, 0], "upper": 0}},
+    {"id": 20, "rule": {"kind": "layer", "origin": [0, 0, 0], "axis": [1, 0, 0], "lower": 0}}
+  ],
+  "mechanics": {"volume_stiffness": 1, "surface_tension": 0, "pressure": 0.25, "contact_range": 0.1},
+  "divisions": [{"time": 0.05, "cell_id": 1, "normal": [1, 0, 0]}]
+}
