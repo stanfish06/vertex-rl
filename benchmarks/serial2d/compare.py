@@ -24,25 +24,54 @@ def finite(text):
     return value
 
 
-def read_index(root):
-    index = {}
-    ids = set()
-    with (root / "frame_index.csv").open("r") as stream:
+class FrameMismatch(ValueError):
+    def __init__(self, threshold, reason):
+        self.threshold = threshold
+        super().__init__(f"threshold {threshold}: {reason}")
+
+
+def indexed_frames(root):
+    """Validate in scheduled order so a missing tail cannot hide an earlier mismatch."""
+    rows = {}
+    unassigned = []
+    try:
+        stream = (root / "frame_index.csv").open("r")
+    except (OSError, KeyError) as error:
+        raise FrameMismatch(THRESHOLDS[0], error) from error
+    with stream:
         reader = csv.DictReader(stream)
         if reader.fieldnames != ["frame_id", "scheduled_time", "actual_time"]:
-            raise ValueError("invalid frame index header")
+            raise FrameMismatch(THRESHOLDS[0], "invalid frame index header")
         for row in reader:
+            try:
+                t = finite(row["scheduled_time"])
+            except (TypeError, ValueError):
+                unassigned.append(reader.line_num)
+                continue
+            rows.setdefault(t, []).append(row)
+    ids = set()
+    unexpected = set(rows) ^ set(THRESHOLDS)
+    for t in sorted(set(rows) | set(THRESHOLDS)):
+        if t in unexpected:
+            raise FrameMismatch(t, f"missing or unexpected thresholds: {sorted(unexpected)}")
+        row = rows[t][0]
+        try:
             if None in row or None in row.values():
                 raise ValueError("invalid frame index column count")
-            t = finite(row["scheduled_time"])
             frame = int(row["frame_id"])
-            if frame <= 0 or frame in ids or t in index:
-                raise ValueError(f"threshold {t}: invalid or duplicate frame {frame}")
+            if frame <= 0 or frame in ids or len(rows[t]) != 1:
+                raise ValueError(f"invalid or duplicate frame {frame}")
             ids.add(frame)
-            index[t] = frame, finite(row["actual_time"])
-    if set(index) != set(THRESHOLDS):
-        raise ValueError(f"missing or unexpected thresholds: {sorted(set(index) ^ set(THRESHOLDS))}")
-    return index
+            actual = finite(row["actual_time"])
+        except ValueError as error:
+            raise FrameMismatch(t, error) from error
+        yield t, (frame, actual)
+    if unassigned:
+        raise ValueError(f"invalid scheduled times in frame index rows {unassigned}")
+
+
+def read_index(root):
+    return dict(indexed_frames(root))
 
 
 @dataclass
@@ -100,14 +129,13 @@ def compare_cell(ref, other):
 
 
 def compare(reference, candidate):
-    ref_index, index = read_index(reference), read_index(candidate)
+    ref_index = read_index(reference)
     maxima = {"actual_time": 0., "area": 0., "vertex_displacement": 0.}
-    for t in THRESHOLDS:
+    for t, (frame, actual) in indexed_frames(candidate):
         ref_frame, ref_actual = ref_index[t]
-        frame, actual = index[t]
         drift = abs(actual - ref_actual)
         if drift > TIME:
-            raise ValueError(f"threshold {t}: actual time {actual}, reference {ref_actual}, limit {TIME}")
+            raise FrameMismatch(t, f"actual time {actual}, reference {ref_actual}, limit {TIME}")
         maxima["actual_time"] = max(drift, maxima["actual_time"])
         try:
             expected = read_snapshot(reference, ref_frame)
@@ -123,7 +151,7 @@ def compare(reference, candidate):
                 maxima["area"] = max(maxima["area"], area)
                 maxima["vertex_displacement"] = max(maxima["vertex_displacement"], displacement)
         except (OSError, KeyError, ValueError) as error:
-            raise ValueError(f"threshold {t}: {error}") from error
+            raise FrameMismatch(t, error) from error
     return maxima
 
 
