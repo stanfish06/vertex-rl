@@ -17,9 +17,9 @@ Policy search and random search each ran 192 training episodes. All 15 held-out 
 
 | Active environments | Solver threads per worker | Simulated time | Elapsed seconds | Simulated time per second |
 | ---: | ---: | ---: | ---: | ---: |
-| 1 | 1 | 4 | 0.222980 | 17.94 |
-| 4 | 1 | 4 | 0.054126 | 73.90 |
+| 1 | 1 | 4 | 0.124786 | 32.05 |
+| 4 | 1 | 4 | 0.030291 | 132.05 |
 
 All four workers replied within the common 30-second readiness deadline in each batch. Timing covered the first reset through the last step return. Each of the four seeds gave exactly equal observations at reset and at all eight decisions, and all episodes reached the time limit. The concurrent-to-sequential rate ratio was **4.12×** for this single short paired measurement.
 
-The host was `lima-devflow-task-dda41e3bf92e`, an Ubuntu VM with four available cores on a Ryzen 7 8845HS. The run used g++ 15.2.0, Python 3.14.4, NumPy 2.5.5, Gymnasium 1.4.0 and one OpenBLAS thread. The [qualification archive](qualification.tar.gz) contains the machine records and native executable hash, reference trajectories, action recordings, scores for every candidate, frozen selections, interval-level held-out returns and both timed replays. In the captured learning output, `truncated` indicates reaching the episode time limit.
+The host was `lima-devflow-task-dda41e3bf92e`, an Ubuntu VM with four available cores on a Ryzen 7 8845HS. The run used g++ 15.2.0, Python 3.14.4, NumPy 2.5.5, Gymnasium 1.4.0 and one OpenBLAS thread. The [qualification archive](qualification.tar.gz) contains the machine records and native executable hash, reference trajectories, action recordings, scores for every candidate, frozen selections, interval-level held-out returns and both timed replays. After the oblique-cut geometry repair, the release build reproduced the frozen selections and every held-out interval's action, time and reward exactly.
