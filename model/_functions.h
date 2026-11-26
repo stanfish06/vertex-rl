@@ -55,7 +55,11 @@ float **ve_next_time;
 float **vv_next_time;
 int Nv, Ne, Nc;
 float *perioXYZ;
-int array_max=50000;
+#ifndef VERTEX_ARRAY_CAPACITY
+#define VERTEX_ARRAY_CAPACITY 50000
+#endif
+const int array_max = VERTEX_ARRAY_CAPACITY;
+static_assert(array_max > 0, "vertex array capacity must be positive");
 int **ids, **exist;
 float wA, wL, wS;
 

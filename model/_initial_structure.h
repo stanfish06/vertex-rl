@@ -293,7 +293,7 @@ void set_initial_singleCell(){
     float width = max_x;
     float height = max_y; 
     // number of random samples
-    srand(646);
+    srand(placement_seed);
     int nrC_try =20;
     int nrC_per_row = int(width);
     int nrC_per_col = int(height);
@@ -346,6 +346,9 @@ void set_initial_singleCell(){
 	    //std::cout << in_domain_some_distance_to_edge(c_x, c_y) << std::endl;
             for(int i=1; i<=nrV; i++) make_vertex(R0*cos(2*M_PI*i/nrV+0.1)+c_x,R0*sin(2*M_PI*i/nrV+0.1)+c_y);
             nrC++;
+            if (reference_output) {
+                printf("placement,%d,%d,%.9g,%.9g\n", n, nrC, c_x, c_y);
+            }
         }
     }
     
@@ -390,11 +393,12 @@ void set_initial_singleCell(){
     delete [] sides;
     
     //MAKE CELLS
-    printf("%d", Nc);
+    printf("%d\n", Nc);
 
     for(int i=1; i<=Nc; i++) if(c[i][0]!=0) {
         make_cell(i);
         calc_cell_center(i);
+        if (reference_output) printf("initial_zone,%d,%d\n", i, get_subdomain(i));
     }
 
     //Domain polygon
