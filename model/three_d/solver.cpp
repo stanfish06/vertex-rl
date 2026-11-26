@@ -35,13 +35,14 @@ Solver::Solver(Experiment experiment, unsigned seed, int threads)
       cells_(std::move(experiment.cells)), material_(experiment.material), random_(seed), threads_(threads) {
     if (threads < 1) throw std::invalid_argument("threads must be positive");
     const auto& m = material_;
-    for (double value : {m.volume_stiffness, m.surface_tension, m.pressure}) {
+    for (double value : {m.volume_stiffness, m.surface_tension, m.pressure, m.growth_half_size, m.smoothing}) {
         if (!std::isfinite(value) || value < 0) throw std::invalid_argument("invalid mechanical coefficient");
     }
     for (double value : {m.contact_range, m.bin_width, m.max_displacement, m.max_step, m.min_step}) {
         if (!std::isfinite(value) || value <= 0) throw std::invalid_argument("invalid length or step bound");
     }
     if (m.min_step > m.max_step) throw std::invalid_argument("min_step exceeds max_step");
+    if (m.remesh_level < 0 || m.remesh_level > 6) throw std::invalid_argument("remesh_level must be 0 to 6");
     validate(wall_);
     if (regions_.empty()) regions_.push_back({Zone{0, [](Vec3) { return true; }}});
     std::set<int> ids;
@@ -83,6 +84,31 @@ const Region& Solver::region(int id) const {
     return *std::find_if(regions_.begin(), regions_.end(), [id](const Region& r) { return r.zone.id == id; });
 }
 
+bool Solver::rebuild(Cell& cell) const {
+    // The rebuilt vertices lie on the current surface along rays from the
+    // centroid. Chords of a dented surface can bulge past it, so contract toward
+    // the centroid until every new face centroid lies inside the current cell.
+    // The rebuilt cell then occupies only space the cell already occupied.
+    Mesh sphere_mesh;
+    try { sphere_mesh = star_remesh(cell.mesh, cell.geometry.centroid, material_.remesh_level); }
+    catch (const std::invalid_argument&) { return false; }
+    for (double scale : {0.99, 0.97, 0.94, 0.9}) {
+        Cell copy = cell;
+        copy.mesh = sphere_mesh;
+        for (Vec3& v : copy.mesh.vertices) v = cell.geometry.centroid + (v - cell.geometry.centroid) * scale;
+        bool inside = true;
+        for (const Face& f : copy.mesh.faces) {
+            Vec3 c = (copy.mesh.vertices[f[0]] + copy.mesh.vertices[f[1]] + copy.mesh.vertices[f[2]]) / 3;
+            if (locate_point(cell.mesh, c) < 0) { inside = false; break; }
+        }
+        if (!inside || !contains(wall_, copy.mesh)) continue;
+        try { measure_cell(copy); } catch (const std::exception&) { return false; }
+        cell = std::move(copy);
+        return true;
+    }
+    return false;
+}
+
 bool Solver::cut(std::vector<Cell>& tissue, int id, Vec3 normal, int& next_id, double born) const {
     auto parent = std::find_if(tissue.begin(), tissue.end(), [id](const Cell& c) { return c.id == id; });
     if (parent == tissue.end()) throw std::invalid_argument("unknown cell ID " + std::to_string(id));
@@ -99,6 +125,13 @@ bool Solver::cut(std::vector<Cell>& tissue, int id, Vec3 normal, int& next_id, d
     }
     double total = a.geometry.volume + b.geometry.volume;
     if (std::abs(total - parent->geometry.volume) > 1e-9 * parent->geometry.volume) return false;
+    if (material_.remesh_level > 0) {
+        // Daughters inherit the cut triangulation, including the long thin
+        // triangles of the planar cap. Rebuild each on a uniform sphere.
+        rebuild(a);
+        rebuild(b);
+        total = a.geometry.volume + b.geometry.volume;
+    }
     a.born = b.born = born;
     a.growing = b.growing = parent->growing;
     a.target_volume = parent->target_volume * (a.geometry.volume / total);
@@ -129,11 +162,29 @@ std::vector<std::vector<Vec3>> Solver::forces() const {
     std::vector<std::vector<Vec3>> result(cells_.size());
     parallel_tasks(cells_.size(), threads_, [&](int i) {
         result[i] = internal_forces(*list[i], cells_[i].target_volume, m.volume_stiffness, m.surface_tension);
+        // Without a wall reaction a cell growing into the wall can only shorten
+        // its step until the minimum and fail.
+        auto wall = wall_forces(*list[i], wall_, m.contact_range, m.pressure, m.contact_barrier);
+        for (size_t k = 0; k < wall.size(); ++k) result[i][k] += wall[k];
+        if (m.smoothing > 0) {
+            // Umbrella Laplacian: keeps vertices evenly spread and damps the
+            // short-wavelength folds that contact pressure excites at corners.
+            const Mesh& mesh = *list[i];
+            std::vector<Vec3> sum(mesh.vertices.size());
+            std::vector<int> degree(mesh.vertices.size(), 0);
+            for (const auto& item : mesh.edges) {
+                auto [p, q] = item.first;
+                sum[p] += mesh.vertices[q]; sum[q] += mesh.vertices[p];
+                ++degree[p]; ++degree[q];
+            }
+            for (size_t k = 0; k < sum.size(); ++k)
+                if (degree[k]) result[i][k] += (sum[k] / degree[k] - mesh.vertices[k]) * m.smoothing;
+        }
     });
     std::vector<PairForces> buffers(pairs.size());
     parallel_tasks(pairs.size(), threads_, [&](int k) {
         auto [a,b] = pairs[k];
-        buffers[k] = contact_forces(*list[a], *list[b], m.contact_range, m.pressure);
+        buffers[k] = contact_forces(*list[a], *list[b], m.contact_range, m.pressure, true, m.contact_barrier);
     });
     // Cells stay in ascending ID order. The grid supplies sorted unique pairs.
     std::vector<std::vector<int>> incident(cells_.size());
@@ -187,9 +238,26 @@ void Solver::policy_step(double deadline, std::vector<Action> actions) {
     }
 }
 
+bool Solver::repair(const std::vector<Cell>& trial) {
+    std::vector<bool> offending(cells_.size(), false);
+    auto old = meshes(cells_);
+    for (size_t i = 0; i < cells_.size(); ++i) {
+        try { validate_geometry(trial[i].mesh); } catch (const std::invalid_argument&) { offending[i] = true; }
+        if (swept_crossing(cells_[i].mesh, trial[i].mesh, wall_, wall_)) offending[i] = true;
+    }
+    for (auto [i, j] : contact_pairs(old, material_.contact_range + material_.max_displacement, material_.bin_width)) {
+        if (swept_crossing(cells_[i].mesh, trial[i].mesh, cells_[j].mesh, trial[j].mesh)) offending[i] = offending[j] = true;
+    }
+    bool repaired = false;
+    for (size_t i = 0; i < cells_.size(); ++i) if (offending[i]) repaired |= rebuild(cells_[i]);
+    return repaired;
+}
+
 void Solver::advance(double deadline, bool builtin_fates) {
     if (!std::isfinite(deadline) || deadline <= time_) throw std::invalid_argument("deadline must be later than time");
+    int repairs = 0;
     while (time_ < deadline && !cells_.empty()) {
+        bool restart = false;
         auto force = forces();
         double max_speed = 0;
         for (const auto& cell : force) for (Vec3 f : cell) {
@@ -223,11 +291,18 @@ void Solver::advance(double deadline, bool builtin_fates) {
                 } catch (const std::invalid_argument&) { valid = false; }
             }
             if (valid) break;
-            if (dt <= material_.min_step) throw std::runtime_error("crossing or invalid mesh at minimum step");
+            if (dt <= material_.min_step) {
+                // Repair the cells whose trial folds or crosses by rebuilding
+                // their meshes, then recompute forces. Each repair contracts a
+                // cell slightly, so repeated repairs cannot cycle indefinitely.
+                if (material_.remesh_level > 0 && repairs < 8 && repair(proposed)) { ++repairs; restart = true; break; }
+                throw std::runtime_error("crossing or invalid mesh at minimum step");
+            }
             dt = std::max(material_.min_step, dt*0.5);
             ++rejected;
         }
 
+        if (restart) continue;
         // Fate sampling follows accepted geometry in stable cell ID order.
         // The working generator and ID counter commit with the cells and time.
         auto rng = random_;
@@ -237,7 +312,9 @@ void Solver::advance(double deadline, bool builtin_fates) {
         for (auto& cell : proposed) {
             const Region& r = region(cell.zone);
             if (cell.growing && r.allow_growth && cell.target_volume < r.target_size) {
-                cell.target_volume = std::min(r.target_size, cell.target_volume + r.growth_rate * dt);
+                double rate = r.growth_rate;
+                if (material_.growth_half_size > 0) rate /= 1 + cell.geometry.volume / material_.growth_half_size;
+                cell.target_volume = std::min(r.target_size, cell.target_volume + rate * dt);
             }
             if (!std::isfinite(cell.target_volume)) throw std::runtime_error("growth produced a nonfinite target");
             if (!builtin_fates) continue;

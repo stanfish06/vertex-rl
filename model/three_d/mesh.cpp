@@ -482,6 +482,57 @@ Mesh ellipsoid(Vec3 center,Vec3 radii,double max_error) {
 Mesh sphere(Vec3 center,double radius,double max_error) {
     return ellipsoid(center,{radius,radius,radius},max_error);
 }
+Mesh star_remesh(const Mesh& closed,Vec3 center,int level) {
+    require(finite(center) && level>=0 && level<=6,"invalid remesh center or level");
+    Mesh m;
+    m.vertices={{1,0,0},{0,1,0},{-1,0,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    for (int i=0;i<4;++i) {
+        m.faces.push_back({i,(i+1)%4,4});
+        m.faces.push_back({(i+1)%4,i,5});
+    }
+    for (int k=0;k<level;++k) {
+        std::map<Edge,int> cache;
+        auto midpoint=[&](int a,int b) {
+            auto entry=cache.try_emplace(edge(a,b),int(m.vertices.size()));
+            if (entry.second) m.vertices.push_back(unit(m.vertices[a]+m.vertices[b]));
+            return entry.first->second;
+        };
+        std::vector<Face> refined;
+        refined.reserve(4*m.faces.size());
+        for (auto f:m.faces) {
+            int a=midpoint(f[0],f[1]),b=midpoint(f[1],f[2]),c=midpoint(f[2],f[0]);
+            refined.insert(refined.end(),{{f[0],a,c},{f[1],b,a},{f[2],c,b},{a,b,c}});
+        }
+        m.faces=std::move(refined);
+    }
+    std::vector<Triangle> surface;
+    surface.reserve(closed.faces.size());
+    for (auto f:closed.faces) surface.push_back(triangle(closed,f));
+    for (auto& direction:m.vertices) {
+        // Moller-Trumbore with a small barycentric allowance so that rays through
+        // shared edges and vertices register on at least one incident facet.
+        double nearest=std::numeric_limits<double>::infinity();
+        for (const auto& t:surface) {
+            Vec3 e1=t[1]-t[0],e2=t[2]-t[0],p=cross(direction,e2);
+            double det=dot(e1,p);
+            if (std::abs(det)<=1e-14*dot(e1,e1)) continue;
+            Vec3 s=center-t[0];
+            double u=dot(s,p)/det;
+            if (u<-1e-9 || u>1+1e-9) continue;
+            Vec3 q=cross(s,e1);
+            double v=dot(direction,q)/det;
+            if (v<-1e-9 || u+v>1+1e-9) continue;
+            double distance=dot(e2,q)/det;
+            if (distance<=0) continue;
+            nearest=std::min(nearest,distance);
+        }
+        require(std::isfinite(nearest),"ray from center misses the surface");
+        direction=center+direction*nearest;
+    }
+    topology(m,true);
+    validate(m);
+    return m;
+}
 Mesh cylinder(Vec3 center,double radius,double height,double max_error) {
     require(finite(center) && positive(radius) && positive(height) && positive(max_error),
             "invalid cylinder dimensions, center or surface error");
@@ -718,6 +769,37 @@ Zone interface_zone(int id,const std::string& path,bool positive_side) {
         }
         return positive_side ? signed_distance>=-eps : signed_distance<=eps;
     }};
+}
+std::vector<Vec3> wall_forces(const Mesh& cell,const Mesh& wall,double range,double pressure,bool barrier) {
+    std::vector<Vec3> result(cell.vertices.size());
+    if (!(pressure>0)) return result;
+    std::vector<double> area(cell.vertices.size(),0);
+    for (auto f:cell.faces) {
+        auto t=triangle(cell,f);
+        double a=norm(cross(t[1]-t[0],t[2]-t[0]))/6;
+        for (int k:f) area[k]+=a;
+    }
+    std::vector<Triangle> surface;
+    std::vector<Vec3> normals;
+    for (auto f:wall.faces) {
+        auto t=triangle(wall,f);
+        surface.push_back(t);
+        normals.push_back(unit(cross(t[1]-t[0],t[2]-t[0])));
+    }
+    for (std::size_t i=0;i<cell.vertices.size();++i) {
+        Vec3 p=cell.vertices[i],nearest{};
+        double best=std::numeric_limits<double>::infinity();
+        for (std::size_t j=0;j<surface.size();++j) {
+            Vec3 q=closest_on_triangle(p,surface[j],normals[j]);
+            double d=norm(p-q);
+            if (d<best) { best=d; nearest=q; }
+        }
+        if (best>0 && best<range) {
+            double law=barrier ? range/std::max(best,1e-4*range)-1 : 1-best/range;
+            result[i]=(p-nearest)*(area[i]*pressure*law/best);
+        }
+    }
+    return result;
 }
 int classify(Vec3 centroid,const std::vector<Zone>& ordered) {
     require(finite(centroid),"nonfinite zone centroid");

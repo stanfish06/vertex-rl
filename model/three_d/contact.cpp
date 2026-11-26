@@ -215,7 +215,12 @@ std::vector<CellPair> contact_pairs(const MeshList& cells,double range,double bi
     }
     return {pairs.begin(),pairs.end()};
 }
-PairForces contact_forces(const Mesh& a,const Mesh& b,double range,double pressure,bool box_filter) {
+double contact_law(double gap,double range,bool barrier) {
+    if (!(gap<range)) return 0;
+    if (!barrier) return 1-gap/range;
+    return range/std::max(gap,1e-4*range)-1;
+}
+PairForces contact_forces(const Mesh& a,const Mesh& b,double range,double pressure,bool box_filter,bool barrier) {
     if (!(std::isfinite(range) && range>0 && std::isfinite(pressure) && pressure>=0))
         throw std::invalid_argument("invalid contact parameters");
     auto fa=facets(a,range), fb=facets(b,range);
@@ -236,7 +241,7 @@ PairForces contact_forces(const Mesh& a,const Mesh& b,double range,double pressu
         double gap=norm(c.delta);
         Vec3 direction=gap>eps*std::min(span(fa[*c.supports_a.begin()].t),span(fb[*c.supports_b.begin()].t))
                      ? c.delta/gap : c.zero_direction;
-        Vec3 force=direction*(0.5*area*pressure*std::max(0.,1-gap/range));
+        Vec3 force=direction*(0.5*area*pressure*contact_law(gap,range,barrier));
         distribute(result.first,c.a,force);
         distribute(result.second,c.b,-force);
     }

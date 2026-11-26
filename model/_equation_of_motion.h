@@ -9,11 +9,11 @@ void assemble_edge_row(int i, ContactWrites& writes) {
     if (e_sign_cell(i, cell) < 0) std::swap(a, b);
     auto& due = force_workspace.edge_due[i];
     for (size_t block = 0; block < due.size(); ++block) {
-        if (Time < due[block]) continue;
+        if (contact_now() < due[block]) continue;
         float earliest = std::numeric_limits<float>::infinity();
         int first = block * pair_block_size + 1, last = std::min(first + pair_block_size - 1, Nv);
         for (int j = first; j <= last; ++j) if (exist[1][j] && v_cells[j][1] != cell) {
-            if (Time >= ve_next_time[i][j]) assemble_vertex_edge(i, j, a, b, cell, writes);
+            if (contact_now() >= ve_next_time[i][j]) assemble_vertex_edge(i, j, a, b, cell, writes);
             earliest = std::min(earliest, ve_next_time[i][j]);
         }
         due[block] = earliest;
@@ -24,11 +24,11 @@ void assemble_shoulder_row(int i, ContactWrites& writes) {
     int cell = v_cells[i][1];
     auto& due = force_workspace.shoulder_due[i];
     for (size_t block = i / pair_block_size; block < due.size(); ++block) {
-        if (Time < due[block]) continue;
+        if (contact_now() < due[block]) continue;
         float earliest = std::numeric_limits<float>::infinity();
         int first = block * pair_block_size + 1, last = std::min(first + pair_block_size - 1, Nv);
         for (int j = std::max(i + 1, first); j <= last; ++j) if (exist[1][j] && v_cells[j][1] != cell) {
-            if (Time >= vv_next_time[i][j]) assemble_shoulder(i, j, cell, v_cells[j][1], writes);
+            if (contact_now() >= vv_next_time[i][j]) assemble_shoulder(i, j, cell, v_cells[j][1], writes);
             earliest = std::min(earliest, vv_next_time[i][j]);
         }
         due[block] = earliest;
@@ -197,6 +197,7 @@ float integrate_motion(double& clock, double deadline, bool decision_mode) {
     }
 
     float displacement = FMAX * h;
+    contact_travel += static_cast<double>(FMAX) * dt;
     #pragma omp parallel for num_threads(num_threads_update)
     for (int i = 1; i <= Nv; ++i) if (exist[1][i]) {
         if (!c_dead[v_cells[i][1]]) {

@@ -265,7 +265,7 @@ Experiment experiment(json_object* object, const Path& base) {
     }
     if (auto* obj = field(object,"mechanics",false)) {
         keys(obj,{"volume_stiffness","surface_tension","pressure","contact_range","bin_width",
-                  "max_displacement","max_step","min_step"});
+                  "max_displacement","max_step","min_step","growth_half_size","remesh_level","contact_barrier","smoothing"});
         auto& m = result.material;
         m.volume_stiffness = setting(obj,"volume_stiffness",m.volume_stiffness);
         m.surface_tension = setting(obj,"surface_tension",m.surface_tension);
@@ -274,6 +274,10 @@ Experiment experiment(json_object* object, const Path& base) {
         m.bin_width = setting(obj,"bin_width",m.bin_width);
         m.max_displacement = setting(obj,"max_displacement",m.max_displacement);
         m.max_step = setting(obj,"max_step",m.max_step);
+        m.growth_half_size = setting(obj,"growth_half_size",m.growth_half_size);
+        m.remesh_level = static_cast<int>(setting(obj,"remesh_level",m.remesh_level));
+        m.contact_barrier = flag(obj,"contact_barrier",m.contact_barrier);
+        m.smoothing = setting(obj,"smoothing",m.smoothing);
         m.min_step = setting(obj,"min_step",m.min_step);
     }
     return result;

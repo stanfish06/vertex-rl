@@ -14,8 +14,12 @@ struct PairForces {
     std::vector<Contribution> first, second;
     std::size_t contacts = 0;
 };
+// The default magnitude per unit area is pressure*(1-gap/range), which is
+// bounded, so a compressed cell can push through a neighbor. A barrier law
+// pressure*(range/gap-1) grows without bound as the gap closes.
 PairForces contact_forces(const Mesh&, const Mesh&, double range, double pressure,
-                          bool box_filter = true);
+                          bool box_filter = true, bool barrier = false);
+double contact_law(double gap, double range, bool barrier);
 bool surfaces_intersect(const Mesh&, const Mesh&);
 bool bodies_intersect(const Mesh&, const Mesh&);
 
