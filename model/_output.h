@@ -5,6 +5,22 @@
 //****************************************************************************
 //****************************************************************************
 //****************************************************************************
+FILE* open_output(const char* filename, const char* mode) {
+    FILE* stream = fopen(filename, mode);
+    if (!stream) {
+        perror(filename);
+        exit(EXIT_FAILURE);
+    }
+    return stream;
+}
+
+void close_output(FILE* stream) {
+    if (ferror(stream) || fclose(stream) != 0) {
+        perror("writing simulation output");
+        exit(EXIT_FAILURE);
+    }
+}
+
 float out_polygons(int fcount){
     
     
@@ -15,8 +31,8 @@ float out_polygons(int fcount){
     float *dxdydz = new float[3];
     dxdydz[1]=0; dxdydz[2]=0;
     int vert_ref_id, vert_id;
-    FILE *file2; file2 = fopen(filename2, "wt");
-    FILE *file3; file3 = fopen(filename3, "wt");
+    FILE *file2; file2 = open_output(filename2, "wt");
+    FILE *file3; file3 = open_output(filename3, "wt");
     
     for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
         
@@ -44,15 +60,15 @@ float out_polygons(int fcount){
         fprintf(file2, "\n");
         fprintf(file3, "\n");
     }
-    fclose(file2);
-    fclose(file3);
+    close_output(file2);
+    close_output(file3);
     
     //SHOULDER
     char filename4[100]; char filename5[100];
     snprintf(filename4, sizeof(char) * 100, "./output/XS_%d.txt", fcount);
     snprintf(filename5, sizeof(char) * 100, "./output/YS_%d.txt", fcount);
-    FILE *file4; file4 = fopen(filename4, "wt");
-    FILE *file5; file5 = fopen(filename5, "wt");
+    FILE *file4; file4 = open_output(filename4, "wt");
+    FILE *file5; file5 = open_output(filename5, "wt");
     for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
         
         int srgn=1;
@@ -79,8 +95,8 @@ float out_polygons(int fcount){
         fprintf(file4, "\n");
         fprintf(file5, "\n");
     }
-    fclose(file4);
-    fclose(file5);
+    close_output(file4);
+    close_output(file5);
     
     delete []dxdydz;
     
@@ -91,7 +107,7 @@ float out_to_df(int fcount) {
     char filename[100]; char filename2[100];
     snprintf(filename, sizeof(char) * 100, "./output/snapshot_%d.txt", fcount);
     //snprintf(filename2, sizeof(char) * 100, "./initial/last_snapshot_%d.txt", fcount);
-    FILE *file; file = fopen(filename, "wt");
+    FILE *file; file = open_output(filename, "wt");
     //FILE *file2; file2 = fopen(filename2, "wt");
     fprintf(file, "cell_id,v_x,v_y,vs_x,vs_y,c_x,c_y,A,A0,dead\n");
     //fprintf(file2, "cell_id,v_x,v_y,vs_x,vs_y,c_x,c_y,A,A0,dead\n");
@@ -115,7 +131,7 @@ float out_to_df(int fcount) {
        }
        
     }
-    fclose(file);
+    close_output(file);
     //fclose(file2);
     return 0;
 }
@@ -129,8 +145,8 @@ float out_cell_centroid(int fcount) {
     //float *dxdydz = new float[3];
     //dxdydz[1]=0; dxdydz[2]=0;
     int vert_ref_id, vert_id;
-    FILE *file2; file2 = fopen(filename2, "wt");
-    FILE *file3; file3 = fopen(filename3, "wt");
+    FILE *file2; file2 = open_output(filename2, "wt");
+    FILE *file3; file3 = open_output(filename3, "wt");
     for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
         fprintf(file2, "%d ", i);
         fprintf(file3, "%d ", i);
@@ -141,8 +157,8 @@ float out_cell_centroid(int fcount) {
         fprintf(file2, "\n");
         fprintf(file3, "\n");
     }
-    fclose(file2);
-    fclose(file3);
+    close_output(file2);
+    close_output(file3);
 
     return 0;
 }
@@ -152,7 +168,7 @@ float out_cell_state(int fcount) {
     char filename2[100];
     snprintf(filename2, sizeof(char) * 100, "./output/C_dead_%d.txt", fcount);
     
-    FILE *file2; file2 = fopen(filename2, "wt");
+    FILE *file2; file2 = open_output(filename2, "wt");
     for(int i=1; i<=Nc; i++) if(exist[3][i]==1){
         fprintf(file2, "%d ", i);
 
@@ -160,7 +176,7 @@ float out_cell_state(int fcount) {
             
         fprintf(file2, "\n");
     }
-    fclose(file2);
+    close_output(file2);
 
     return 0;
 }
@@ -197,6 +213,12 @@ void out_tissue(int fcount){
     out_cell_centroid(fcount);
     out_cell_state(fcount);
     out_to_df(fcount);
+    if (reference_output) {
+        FILE* index = open_output("./output/frame_index.csv", fcount == 1 ? "w" : "a");
+        if (fcount == 1) fprintf(index, "frame_id,scheduled_time,actual_time\n");
+        fprintf(index, "%d,%.9g,%.9g\n", fcount, TimeCount, Time);
+        close_output(index);
+    }
 }
 //****************************************************************************
 //void out_Vertissue2D(){

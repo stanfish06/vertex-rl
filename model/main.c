@@ -1,3 +1,4 @@
+#include <charconv>
 #include <cmath>
 #include <stdio.h>
 #include <readline/readline.h>
@@ -32,6 +33,8 @@ float maxDR=0.001;
 float ddTH, ddTHS, vMAX;
 float TimeCount=0;
 int kount=0;
+unsigned int placement_seed = 646;
+bool reference_output = false;
 
 // Parallelism parameters
 int num_threads_count = 16;
@@ -277,6 +280,23 @@ std::string checkUserInput() {
 //********************MAIN********************************
 int main(int argc, char *argv[]){
 
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--reference") == 0) {
+            reference_output = true;
+        } else if (strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
+            const char* value = argv[++i];
+            const char* end = value + strlen(value);
+            auto parsed = std::from_chars(value, end, placement_seed);
+            if (parsed.ec != std::errc() || parsed.ptr != end) {
+                fprintf(stderr, "Invalid unsigned placement seed: %s\n", value);
+                return EXIT_FAILURE;
+            }
+        } else {
+            fprintf(stderr, "Usage: %s [--seed UINT] [--reference]\n", argv[0]);
+            return EXIT_FAILURE;
+        }
+    }
+
 const char* helpManual = R"(
 Usage: 2D vertex model for cartilage simulation
 
@@ -325,7 +345,11 @@ Examples:
             printf("Starting...\n");
 	    goto start_simulation;
 	} else if (buf_str.substr(0, 6) == "resume") {
-	    if (resumeSimulation(buf_str) == 1) {printf("Resuming simulation fails.\n"); return 1;};
+	    if (reference_output) {
+                fprintf(stderr, "Reference runs require fresh placement.\n");
+                return EXIT_FAILURE;
+            }
+            if (resumeSimulation(buf_str) == 1) {printf("Resuming simulation fails.\n"); return 1;};
             goto resume_simulation;	    
         } else {
 	    printf("Unknown command\n");
