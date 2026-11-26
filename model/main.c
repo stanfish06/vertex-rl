@@ -5,6 +5,9 @@
 #include <readline/history.h>
 
 #include "solver_2d.h"
+#ifdef VERTEX_WITH_3D
+#include "three_d/driver.h"
+#endif
 #include <omp.h>
 #include <iostream>
 #include <string>
@@ -118,6 +121,10 @@ std::string checkUserInput() {
 
 //********************MAIN********************************
 int main(int argc, char *argv[]){
+#ifdef VERTEX_WITH_3D
+    if (argc > 1 && std::string(argv[1]) == "--3d") return vertex3d::driver(argc - 1, argv + 1);
+#endif
+
 
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--reference") == 0) {
