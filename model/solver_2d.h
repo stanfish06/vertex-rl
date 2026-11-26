@@ -131,6 +131,7 @@ int min_division_n_edges = 12;
 int min_exist_n_edges = 6;
 //*******************DECLARATIONS*************************
 #include "_functions.h"
+#include "_policy_fates.h"
 
 
 void set_solver_threads(int count) {
@@ -197,6 +198,11 @@ class Solver2D {
                 !std::isfinite(cell.target_area) || !std::isfinite(cell.x) || !std::isfinite(cell.y)) {
                 throw std::runtime_error("invalid geometry or target area in cell " + std::to_string(cell.id));
             }
+            if (training2d.mode) {
+                Ring ring;
+                for (const auto& p : cell.vertices) ring.push_back({p.x,p.y});
+                if (!simple_ring(ring)) throw std::runtime_error("invalid polygon in cell " + std::to_string(cell.id));
+            }
             for (const auto& p : cell.vertices) {
                 if (!std::isfinite(p.x) || !std::isfinite(p.y) ||
                     !std::isfinite(p.shoulder_x) || !std::isfinite(p.shoulder_y)) {
@@ -230,7 +236,44 @@ public:
         allocated = true;
         if (snapshot.empty()) set_initial_singleCell();
         else if (resume_from_snapshot(snapshot)) throw std::runtime_error("cannot resume snapshot " + snapshot);
+        if (training2d.mode) {
+            training2d.agents.assign(array_max+1,0);
+            training2d.born.assign(array_max+1,0);
+            for (int i=1; i<=Nc; ++i) if (exist[3][i]) training2d.birth(i,0);
+        }
         if (decision_mode) commit_observation();
+    }
+
+    void act(int slot, int action, double angle) {
+        const auto& z=training2d.zones.at(training2d.index.at(trained_zone(slot)));
+        if (action==0 && z.allow_growth) c_growth[slot]=1;
+        else if (action==1 && z.allow_stop) c_growth[slot]=0;
+        else if (action==2 && z.allow_division) divide_at_angle(slot,angle,clock);
+        else if (action==3 && z.allow_death) { c_dead[slot]=1; c_growth[slot]=0; }
+    }
+
+    void training_growth(double dt) {
+        const int initial=Nc;
+        for (int i=1; i<=initial; ++i) if (exist[3][i] && !c_dead[i]) {
+            auto& z=training2d.zones.at(training2d.index.at(trained_zone(i)));
+            if (z.allow_growth && c_A0[i] < z.target_size) {
+                if (training2d.mode==1 && !c_growth[i]) c_growth[i]=1;
+                if (c_growth[i]) c_A0[i]=std::min(z.target_size,c_A0[i]+z.growth_rate*dt*(1-c_A0[i]/z.target_size));
+            }
+            if (training2d.mode==2) continue;
+            double threshold=z.target_size/1.5;
+            if (z.allow_death && z.death_rate>0 && c_area[i]>=0.8*threshold &&
+                fate_draw(i,"death",-std::expm1(-dt*z.death_rate))) {
+                c_dead[i]=1; c_growth[i]=0;
+            } else if (z.allow_division && z.division_rate>0 && c_area[i]>threshold &&
+                       c[i][0]>=min_division_n_edges && fate_draw(i,"divide",-std::expm1(-dt*z.division_rate))) {
+                int other=DIVIDE_CELL(i,0.001,get_subdomain(i));
+                c_A0[i]=c_A0[other]=0.5*threshold;
+                c_growth[i]=c_growth[other]=0;
+                training2d.birth(i,clock);
+                training2d.birth(other,clock);
+            }
+        }
     }
 
     const Tissue2D& observation() const { return committed; }
@@ -243,8 +286,14 @@ public:
     void advance(double deadline, void (*sample)(float) = nullptr) {
         if (!allocated) throw std::runtime_error("reset required before advancing");
         try {
+            if (training2d.mode==2) {
+                bool any_live=false;
+                for (int i=1; i<=Nc; ++i) if (exist[3][i] && !c_dead[i]) any_live=true;
+                if (!any_live) { commit_observation(); return; }
+            }
             while (clock < deadline && (!decision_mode || !terminated())) {
-                growth_division();
+                if (!training2d.mode) growth_division();
+                double start=clock;
                 float displacement = integrate_motion(clock, deadline, decision_mode);
                 if (sample) sample(displacement);
                 if (!std::isfinite(displacement) || displacement > maxDR ||
@@ -255,6 +304,7 @@ public:
                 vMAX = 2.*maxDR/h;
                 for (int i = 1; i <= Nc; ++i) resolve_cross_cell(i);
                 edge_manipulation();
+                if (training2d.mode) training_growth(clock-start);
                 if (decision_mode) commit_observation();
             }
         } catch (...) {

@@ -1,3 +1,40 @@
+// Different edges of a small daughter can all be within the legacy cutoff.
+// Use the nearest feature and local coordinates to calculate its reaction.
+void training_edge_contact(int edge, int vertex, int a, int b, int cell, ContactWrites& writes) {
+    int neighbor=v_cells[vertex][1];
+    int zone=force_workspace.zone[cell], other=force_workspace.zone[neighbor];
+    double dx=v[vertex][1]-v[a][1], dy=v[vertex][2]-v[a][2];
+    double ex=v[b][1]-v[a][1], ey=v[b][2]-v[a][2];
+    double length=std::hypot(ex,ey);
+    double t=(dx*ex+dy*ey)/(length*length);
+    if (!(t>0 && t<1)) return;
+    double nx=ey/length, ny=-ex/length, gap=nx*dx+ny*dy;
+    if (gap<=-std::max(CORE[zone],CORE[other])*lALERT || gap>=lS*std::max(ECM[zone],ECM[other])) return;
+    BoundaryDistance nearest;
+    PlanarPoint point{v[vertex][1],v[vertex][2]};
+    for (int k=1; k<=c[cell][0]; ++k) {
+        int id=std::abs(c[cell][k]);
+        auto u=v[e[id][1]], w=v[e[id][2]];
+        nearest.edge(point,{u[1],u[2]},{w[1],w[2]});
+    }
+    if (gap*gap > nearest.squared + 1e-12*length*length) return;
+    double on_vertex=0, on_edge=0;
+    if (gap < 0 && nearest.inside) {
+        on_vertex=on_edge=-2*k0*gap;
+        writes.core_contacts.emplace_back(cell,neighbor);
+    } else if (gap>0 && !nearest.inside) {
+        if (c_area[neighbor]>=0.3*CV[other]) on_vertex=2*kS*std::max(0.,lS*ECM[zone]-gap);
+        if (c_area[cell]>=0.3*CV[zone]) on_edge=2*kS*std::max(0.,lS*ECM[other]-gap);
+        edge_vertex_int[edge][vertex]=1;
+        force_workspace.marked_vertices[edge].push_back(vertex);
+    }
+    if (on_vertex) writes.edge_vertex[vertex].push_back({nx*on_vertex,ny*on_vertex});
+    if (on_edge) {
+        writes.edge_vertex[a].push_back({-(1-t)*nx*on_edge,-(1-t)*ny*on_edge});
+        writes.edge_vertex[b].push_back({-t*nx*on_edge,-t*ny*on_edge});
+    }
+}
+
 void assemble_vertex_edge(int i, int j, int v1, int v2, int cID, ContactWrites& writes) {
     int cell_j = v_cells[j][1];
     int zone_i = force_workspace.zone[cID], zone_j = force_workspace.zone[cell_j];
@@ -10,6 +47,10 @@ void assemble_vertex_edge(int i, int j, int v1, int v2, int cID, ContactWrites& 
     ve_next_time[i][j] = Time+(dd-ddTH)/vMAX;
     float cutoff = sqrt(pow(lthUP/2,2)+pow(lS*std::max(ss_ci,ss_cj)+lALERT*std::max(ss_lA_ci,ss_lA_cj),2));
     if (!(dd < cutoff)) return;
+    if (training2d.mode) {
+        training_edge_contact(i,j,v1,v2,cID,writes);
+        return;
+    }
     float v1x=v[v1][1], v1y=v[v1][2], v2x=v[v2][1], v2y=v[v2][2];
     float vx=v[j][1], vy=v[j][2];
     float Rx=vx-v1x, Ry=vy-v1y;

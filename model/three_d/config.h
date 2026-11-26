@@ -18,6 +18,9 @@ int integer(json_object* value, int minimum = 0);
 unsigned seed_value(json_object* value);
 Vec3 vector3(json_object* value);
 double setting(json_object* object, const char* key, double fallback);
+void zone_overrides(std::vector<Region>& regions, json_object* array);
+void controls(std::vector<Region>& regions, json_object* array);
+std::vector<Action> cell_actions(json_object* array);
 Experiment experiment(json_object* object, const Path& base);
-Json state(const Solver& solver);
+Json state(const Solver& solver, bool training);
 }

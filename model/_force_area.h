@@ -57,6 +57,16 @@ float dA_new(int cellID, int j){
 }
 //****************************************************************************
 float CellArea_new(int i){
+    if (training2d.mode) {
+        int first=c_vertices[i][1];
+        PlanarPoint origin{v[first][1],v[first][2]};
+        double sum=0;
+        for (int j=3; j<=c_vertices[i][0]; ++j) {
+            int a=c_vertices[i][j-1], b=c_vertices[i][j];
+            sum+=orient(origin,{v[a][1],v[a][2]},{v[b][1],v[b][2]});
+        }
+        return sum/2;
+    }
     float areaSum=0;
     for(int j=1; j<=c_vertices[i][0]; j++ ) areaSum += dA_new(i,j);
     return areaSum;

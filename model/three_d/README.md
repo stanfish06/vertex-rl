@@ -67,6 +67,8 @@ A reset accepts either an experiment path or its JSON object. The request's seed
 
 Step deadlines are absolute, capped at the episode limit. Empty tissue returns `terminated`, and the time limit returns `truncated`. A failed trial returns `solver_error` with the committed time and geometry. Measurement and export remain available. Reset explicitly to begin the next episode. An invalid request returns `error`.
 
+The training reset modes add bounded zone controls or a single action per live cell at each decision boundary. [Training worker protocol](../worker.md#training-intervals-in-both-dimensions).
+
 ## Verification
 
 ```sh

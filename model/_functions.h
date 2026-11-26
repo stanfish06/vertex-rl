@@ -87,6 +87,9 @@ float **v_interface;
 int lateral_normal[2] = {1, 9};
 float boundary_x[2] = {(2*sqrt(2)) * scale_factor, (2*sqrt(2) + 4) * scale_factor};
 
+int get_subdomain(int cell_id);
+#include "_training_2d.h"
+
 #include "_torus.h"
 #include "_arrays.h"
 #include "_free_id.h"
