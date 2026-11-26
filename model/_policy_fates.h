@@ -27,6 +27,33 @@ Ring half_ring(const Ring& parent, PlanarPoint center, PlanarPoint normal, int s
     return result;
 }
 
+// The cut leaves each daughter one long straight edge facing its sibling.
+// Contact acts between a vertex and the interior of an opposing edge, and the
+// two cut edges share their end points, so without interior vertices the
+// siblings slide through each other. Add points spaced at most lthUP apart and
+// offset by half a spacing between siblings so each projects inside an edge.
+void refine_cut(Ring& ring, PlanarPoint center, PlanarPoint normal, int sign, double gap, double stagger) {
+    auto distance=[&](PlanarPoint p) {
+        return sign*((p[0]-center[0])*normal[0]+(p[1]-center[1])*normal[1])-gap;
+    };
+    const double tolerance=1e-4;
+    for (size_t i=0; i<ring.size(); ++i) {
+        auto a=ring[i], b=ring[(i+1)%ring.size()];
+        if (std::abs(distance(a))>tolerance || std::abs(distance(b))>tolerance) continue;
+        double length=std::hypot(b[0]-a[0],b[1]-a[1]);
+        int pieces=std::max(2,static_cast<int>(std::ceil(length/lthUP)));
+        Ring inserted;
+        for (int k=0; k<pieces; ++k) {
+            double t=(k+stagger)/pieces;
+            if (t<=1e-6 || t>=1-1e-6) continue;
+            inserted.push_back({static_cast<float>(a[0]+t*(b[0]-a[0])),
+                                static_cast<float>(a[1]+t*(b[1]-a[1]))});
+        }
+        if (ring.size()+inserted.size()<198) ring.insert(ring.begin()+i+1,inserted.begin(),inserted.end());
+        return;
+    }
+}
+
 int materialize_ring(const Ring& ring, int slot) {
     std::vector<int> vertices;
     for (const auto& p : ring) vertices.push_back(make_vertex(p[0],p[1]));
@@ -60,6 +87,11 @@ bool divide_at_angle(int slot, double angle, double time) {
     auto one=half_ring(parent,center,normal,1,gap);
     auto two=half_ring(parent,center,normal,-1,gap);
     if (!closed_daughter(one) || !closed_daughter(two)) return false;
+    if (training2d.mode) {
+        refine_cut(one,center,normal,1,gap,0);
+        refine_cut(two,center,normal,-1,gap,0.5);
+        if (!closed_daughter(one) || !closed_daughter(two)) return false;
+    }
     int extra=static_cast<int>(one.size()+two.size())-static_cast<int>(parent.size());
     if (extra>array_max-Nv+ids[1][0] || extra>array_max-Ne+ids[2][0] || Nc-ids[3][0]>=array_max) return false;
 

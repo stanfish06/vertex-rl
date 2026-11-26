@@ -46,12 +46,22 @@ std::pair<Mesh,Mesh> split(const Mesh&,Vec3 plane_point,Vec3 normal);
 
 Mesh box(Vec3 lo,Vec3 hi);
 Mesh sphere(Vec3 center,double radius,double max_error);
+// Rebuild a closed mesh on an octahedral sphere of the given subdivision level.
+// Each new vertex lies at the first crossing of the input surface along its ray
+// from center, an interior point. The rebuilt surface therefore bounds the part
+// of the cell visible from center; for a star-shaped cell that is all of it.
+// Throws std::invalid_argument when a ray misses or the result is not embedded.
+Mesh star_remesh(const Mesh& closed,Vec3 center,int level);
 Mesh ellipsoid(Vec3 center,Vec3 radii,double max_error);
 Mesh cylinder(Vec3 center,double radius,double height,double max_error);  // axis +z
 Mesh import_wall(const std::string& path);  // OBJ or STL, validated as supplied
 int locate_point(const Mesh& closed,Vec3 point);  // exterior -1, boundary 0, interior +1
 bool contains_point(const Mesh& closed,Vec3 point);  // includes boundary
 bool contains(const Mesh& wall,const Mesh& cell);    // wholly in the strict interior
+// Repulsion of an enclosed cell from its wall. A vertex closer than range to the
+// wall surface is pushed away along the closest-point direction with
+// pressure * (vertex area) times the cell-cell contact law (see contact.h).
+std::vector<Vec3> wall_forces(const Mesh& cell,const Mesh& wall,double range,double pressure,bool barrier=false);
 
 struct Zone { int id; std::function<bool(Vec3)> matches; };
 Zone layer(int id,Vec3 origin,Vec3 axis,double lower,double upper);

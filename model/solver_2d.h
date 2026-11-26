@@ -156,7 +156,13 @@ struct ModelParameter {
     }
 };
 
+float growth_half_size = 0;  // optional measured area at half the regional growth rate
+// Training-mode cap on polygon sides. Edges longer than lthUP split only while a
+// cell is below the cap, and contact needs vertices along every facing side.
+float max_edges = 14;
+
 ModelParameter model_parameters[] = {
+    {"growth_half_size", growth_half_size}, {"max_edges", max_edges},
     {"k0", k0}, {"kS", kS}, {"lS", lS}, {"kA", kA}, {"e_g0", e_g0},
     {"maxDR", maxDR}, {"lthUP", lthUP}, {"lthDOWN", lthDOWN}, {"lALERT", lALERT},
     {"resting_CV", CV[0], CV[0], &CORE[0]}, {"proliferative_CV", CV[1], CV[1], &CORE[1]},
@@ -223,6 +229,9 @@ public:
         release_workspace();
         committed = {};
         Time = TimeCount = h = 0;
+        contact_travel = 0;
+        static const int legacy_edges = max_num_edges;
+        max_num_edges = training2d.mode ? std::clamp(static_cast<int>(std::lround(max_edges)), 6, 96) : legacy_edges;
         clock = 0;
         kount = initial_frame;
         placement_seed = seed;
@@ -258,7 +267,11 @@ public:
             auto& z=training2d.zones.at(training2d.index.at(trained_zone(i)));
             if (z.allow_growth && c_A0[i] < z.target_size) {
                 if (training2d.mode==1 && !c_growth[i]) c_growth[i]=1;
-                if (c_growth[i]) c_A0[i]=std::min(z.target_size,c_A0[i]+z.growth_rate*dt*(1-c_A0[i]/z.target_size));
+                if (c_growth[i]) {
+                    double rate = z.growth_rate;
+                    if (growth_half_size > 0) rate /= 1 + c_area[i] / static_cast<double>(growth_half_size);
+                    c_A0[i] = std::min(z.target_size, c_A0[i] + rate*dt*(1-c_A0[i]/z.target_size));
+                }
             }
             if (training2d.mode==2) continue;
             double threshold=z.target_size/1.5;

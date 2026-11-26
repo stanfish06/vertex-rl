@@ -16,6 +16,10 @@ struct Material {
     double max_displacement = 0.05;
     double max_step = 0.01;
     double min_step = 1e-8;
+    double growth_half_size = 0;  // volume at half the regional growth rate; zero disables
+    int remesh_level = 0;         // octahedral level for rebuilt daughter meshes; zero keeps cut meshes
+    bool contact_barrier = false; // contact grows as range/gap-1 instead of the bounded 1-gap/range
+    double smoothing = 0;         // pull of each vertex toward its neighbors' mean; resists folding
 };
 
 struct Region {
@@ -76,6 +80,8 @@ private:
     void measure_cell(Cell& cell) const;
     const Region& region(int id) const;
     bool cut(std::vector<Cell>& tissue, int id, Vec3 normal, int& next_id, double born) const;
+    bool rebuild(Cell& cell) const;
+    bool repair(const std::vector<Cell>& trial);
     std::vector<std::vector<Vec3>> forces() const;
 };
 }

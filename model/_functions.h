@@ -51,6 +51,10 @@ float eGamma=0;
 
 //MISC
 bool force_topology_changed = true;
+// Training workers schedule contact checks by accumulated displacement. The
+// adaptive step bounds how far a vertex moves per step, not how fast it moves,
+// so a time schedule using vMAX misses contacts once forces exceed vMAX/2.
+double contact_travel = 0;
 int **edge_vertex_int; // indexed by edge, then vertex
 float **ve_next_time;
 float **vv_next_time;

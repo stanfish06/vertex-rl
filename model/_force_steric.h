@@ -1,3 +1,11 @@
+// Clock and closing bound shared by the contact schedules. Each step moves a
+// vertex, and hence an edge center or half-length, by at most FMAX*h, so the
+// distance minus cutoff of a vertex-edge pair shrinks by at most three times that.
+inline float contact_now() { return training2d.mode ? static_cast<float>(contact_travel) : Time; }
+inline float contact_due(float dd, float reach, float legacy_reach) {
+    if (training2d.mode) return static_cast<float>(contact_travel + std::max(0.f, dd - reach) / 3);
+    return Time + (dd - legacy_reach) / vMAX;
+}
 // Different edges of a small daughter can all be within the legacy cutoff.
 // Use the nearest feature and local coordinates to calculate its reaction.
 void training_edge_contact(int edge, int vertex, int a, int b, int cell, ContactWrites& writes) {
@@ -44,8 +52,10 @@ void assemble_vertex_edge(int i, int j, int v1, int v2, int cID, ContactWrites& 
     float ss_ci = ECM[zone_i], ss_cj = ECM[zone_j];
 
     float dd = torus_distance(v[j][1], v[j][2], e_center[i][1], e_center[i][2]);
-    ve_next_time[i][j] = Time+(dd-ddTH)/vMAX;
-    float cutoff = sqrt(pow(lthUP/2,2)+pow(lS*std::max(ss_ci,ss_cj)+lALERT*std::max(ss_lA_ci,ss_lA_cj),2));
+    // Edges at the per-cell edge limit can be longer than lthUP.
+    float half = training2d.mode ? std::max(lthUP, e_length[i])/2 : lthUP/2;
+    float cutoff = sqrt(pow(half,2)+pow(lS*std::max(ss_ci,ss_cj)+lALERT*std::max(ss_lA_ci,ss_lA_cj),2));
+    ve_next_time[i][j] = contact_due(dd, cutoff, ddTH);
     if (!(dd < cutoff)) return;
     if (training2d.mode) {
         training_edge_contact(i,j,v1,v2,cID,writes);
