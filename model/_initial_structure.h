@@ -135,140 +135,120 @@ int resume_from_snapshot(std::string filepath) {
 }
 
 //****************************************************************************
-int read_and_set_domain() {
-    std::ifstream domain_coords("./initial/domain_coords.txt");
-    std::ifstream domain_v_ns("./initial/domain_v_ns.txt");
-    std::ifstream domain_v_ts("./initial/domain_v_ts.txt");
+using Point2D = std::array<float, 2>;
 
-    if (!domain_coords.is_open()) {
-        std::cerr << "Error opening the file" << std::endl;
-	return 1;
+template <typename T>
+void release_rows(T**& rows) {
+    if (!rows) return;
+    int count = static_cast<int>(rows[0][0]);
+    for (int i = 0; i <= count; ++i) delete[] rows[i];
+    delete[] rows;
+    rows = nullptr;
+}
+
+void release_domain() {
+    release_rows(v_D);
+    release_rows(e_D);
+    release_rows(e_normal_unit_vector);
+    release_rows(e_tangent_unit_vector);
+    release_rows(v_interface);
+    release_rows(e_normal_unit_vector_interface);
+}
+
+Point2D read_pair(std::istream& input) {
+    Point2D point;
+    char comma;
+    if (!(input >> point[0] >> comma >> point[1]) || comma != ',' ||
+        !std::isfinite(point[0]) || !std::isfinite(point[1])) {
+        throw std::runtime_error("expected two finite comma-separated coordinates");
     }
+    return point;
+}
 
-    int numLines = 0;
+std::vector<Point2D> read_points(const char* path) {
+    std::ifstream file(path);
+    if (!file) throw std::runtime_error(std::string("cannot open ") + path);
+    std::vector<Point2D> points;
     std::string line;
-    while (std::getline(domain_coords, line)) {
-    	numLines++;
+    while (std::getline(file, line)) {
+        std::istringstream row(line);
+        points.push_back(read_pair(row));
+        row >> std::ws;
+        if (!row.eof()) throw std::runtime_error(std::string("unexpected fields in ") + path);
     }
+    return points;
+}
 
-    domain_coords.close();
-    domain_coords.open("./initial/domain_coords.txt");
-
-    v_D = new float*[numLines + 1];
-    e_D = new int*[numLines + 1];
-    e_normal_unit_vector = new float*[numLines + 1];
-    e_tangent_unit_vector = new float*[numLines + 1];
-    v_D[0] = new float[3];
-    v_D[0][0] = numLines;
-    e_D[0] = new int[2];
-    e_D[0][0] = numLines;
-    e_normal_unit_vector[0] = new float[3];
-    e_normal_unit_vector[0][0] = numLines;
-    e_tangent_unit_vector[0] = new float[3];
-    e_tangent_unit_vector[0][0] = numLines;
-
-    for (int i = 1; i <= numLines; i++) {
-    	v_D[i] = new float[3];
-	if (i == numLines) {
-	    e_D[i] = new int[2];
-	    e_D[i][0] = numLines;
-	    e_D[i][1] = 1; 
-	} else {
-	    e_D[i] = new int[2];
-	    e_D[i][0] = i;
-	    e_D[i][1] = i + 1;
-	}
-	e_normal_unit_vector[i] = new float[3];
-	e_tangent_unit_vector[i] = new float[3];
+float** point_rows(const std::vector<Point2D>& points) {
+    auto rows = new float*[points.size() + 1];
+    rows[0] = new float[3]{static_cast<float>(points.size()), 0, 0};
+    for (size_t i = 0; i < points.size(); ++i) {
+        rows[i+1] = new float[3]{0, points[i][0], points[i][1]};
     }
+    return rows;
+}
 
-    for (int i = 1; i <= numLines; i++) {
-        std::getline(domain_coords, line);
-	std::istringstream iss_v_D(line);
-        float x, y;
-	char comma;
-        iss_v_D >> x >> comma >> y;
-	//printf("%f, %f\n", x, y);
-	v_D[i][1] = x;
-	v_D[i][2] = y;
-
-	std::getline(domain_v_ns, line);
-        std::istringstream iss_e_n(line);
-        iss_e_n >> x >> comma >> y;
-	//printf("%f, %f\n", x, y);
-        e_normal_unit_vector[i][1] = x;
-        e_normal_unit_vector[i][2] = y;
-
-	std::getline(domain_v_ts, line);
-        std::istringstream iss_e_t(line);
-        iss_e_t >> x >> comma >> y;
-	//printf("%f, %f\n", x, y);
-        e_tangent_unit_vector[i][1] = x;
-        e_tangent_unit_vector[i][2] = y;	
+int read_and_set_domain() {
+    try {
+        auto vertices = read_points("./initial/domain_coords.txt");
+        auto normals = read_points("./initial/domain_v_ns.txt");
+        auto tangents = read_points("./initial/domain_v_ts.txt");
+        if (vertices.size() < 3 || normals.size() != vertices.size() ||
+            tangents.size() != vertices.size()) {
+            throw std::runtime_error("domain needs matching vertex, normal and tangent rows");
+        }
+        release_rows(v_D);
+        release_rows(e_D);
+        release_rows(e_normal_unit_vector);
+        release_rows(e_tangent_unit_vector);
+        v_D = point_rows(vertices);
+        e_normal_unit_vector = point_rows(normals);
+        e_tangent_unit_vector = point_rows(tangents);
+        int count = static_cast<int>(vertices.size());
+        e_D = new int*[count + 1];
+        e_D[0] = new int[2]{count, 0};
+        for (int i = 1; i <= count; ++i) e_D[i] = new int[2]{i, i % count + 1};
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << std::endl;
+        return 1;
     }
-
-    return 0;
 }
 
 int read_and_set_interface() {
-    std::ifstream interface_coords("./initial/interface_coords.txt");
-    std::ifstream interface_v_ns("./initial/interface_v_ns.txt");
-    
-    if (!interface_coords.is_open()) {
-        std::cerr << "Error opening the file" << std::endl;
+    try {
+        auto normals = read_points("./initial/interface_v_ns.txt");
+        if (normals.size() > sizeof(CV) / sizeof(CV[0])) {
+            throw std::runtime_error("more interfaces than configured cell zones");
+        }
+        std::ifstream file("./initial/interface_coords.txt");
+        std::string line;
+        if (!file || (!std::getline(file, line) && !normals.empty())) {
+            throw std::runtime_error("cannot read interface anchors");
+        }
+        std::istringstream row(line);
+        std::vector<Point2D> anchors;
+        for (size_t i = 0; i < normals.size(); ++i) {
+            char comma;
+            if (i && (!(row >> comma) || comma != ',')) {
+                throw std::runtime_error("missing interface anchor");
+            }
+            anchors.push_back(read_pair(row));
+        }
+        release_rows(v_interface);
+        release_rows(e_normal_unit_vector_interface);
+        v_interface = point_rows(anchors);
+        e_normal_unit_vector_interface = point_rows(normals);
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << std::endl;
         return 1;
     }
-    int numLines = 0;
-    std::string line;
-    while (std::getline(interface_v_ns, line)) {
-        numLines++;
-    }
-
-    interface_v_ns.close();
-    interface_v_ns.open("./initial/interface_v_ns.txt");
-    
-    v_interface = new float*[numLines + 1];
-    e_normal_unit_vector_interface = new float*[numLines + 1];
-    v_interface[0] = new float[3];
-    v_interface[0][0] = numLines;
-    e_normal_unit_vector_interface[0] = new float[3];
-    e_normal_unit_vector_interface[0][0] = numLines;
- 
-    for (int i = 1; i <= numLines; i++) {
-    	v_interface[i] = new float[3];
-	e_normal_unit_vector_interface[i] = new float[3];
-    }
-
-    std::string line_coords;
-    std::string line_v_ns;
-    std::getline(interface_coords, line_coords);
-    std::istringstream iss_v_interface(line_coords); 
-    for (int i = 1; i <= numLines; i++) {
-        float x, y;
-	char comma;
-	if (i == 1) {
-            iss_v_interface >> x >> comma >> y;
-	} else {
-	    iss_v_interface >> comma >> x >> comma >> y;
-	}
-	//printf("%f, %f\n", x, y);
-	v_interface[i][1] = x;
-	v_interface[i][2] = y;
-
-	std::getline(interface_v_ns, line_v_ns);
-        std::istringstream iss_e_n(line_v_ns);
-        iss_e_n >> x >> comma >> y;
-	//printf("%f, %f\n", x, y);
-        e_normal_unit_vector_interface[i][1] = x;
-        e_normal_unit_vector_interface[i][2] = y;
-    }
-    
-    return 0;
 }
 
 void set_initial_singleCell(){
     
-    int *sides; sides = new int[101];
+    int sides[101] = {};
     
     float min_x = 0;
     float max_x = -1;
@@ -390,7 +370,7 @@ void set_initial_singleCell(){
     //for(int i=0; i<=100; i++) sides[i]=0;
     //for(int i=1; i<=nrE; i++) sides[i]=i;
     //cell_sides(nrE,sides,0);
-    delete [] sides;
+
     
     //MAKE CELLS
     printf("%d\n", Nc);

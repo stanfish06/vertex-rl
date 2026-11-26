@@ -6,13 +6,13 @@
 int appendToArray(int **aRray, int i, int el){
     
     //CRITICAL ERRORS
-    if(i==0) { printf("%g| ERROR: array id=0!\n", Time);   exit(0); }
-    if(el==0){ printf("%g| ERROR: element id=0!\n", Time); exit(0); }
+    if(i==0) { throw std::runtime_error("array id=0"); }
+    if(el==0){ throw std::runtime_error("element id=0"); }
     
     //CHECK ELEMENTS OF aRray
     for(int k=1; k<=aRray[i][0]; k++){
         if( el==aRray[i][k] ) return 0;
-        if( el==-aRray[i][k] ) { printf("%g| ERROR: this element already present but with different sign!\n", Time); exit(0); }
+        if( el==-aRray[i][k] ) { throw std::runtime_error("this element already present but with different sign"); }
     }
     
     //ADD ELEMENT TO aRray
@@ -27,12 +27,12 @@ int appendToArrayDouble(float **aRray, int i, float el){
 int appendToList(int *lIst, int el){
     
     //CRITICAL ERRORS
-    if(el==0){ printf("%g| ERROR: element id=0!\n", Time); exit(0); }
+    if(el==0){ throw std::runtime_error("element id=0"); }
     
     //CHECK ELEMENTS OF lIst
     for(int k=1; k<=lIst[0]; k++){
         if( el==lIst[k] ) return 0;
-        if( el==-lIst[k] ) { printf("%g| ERROR: this element already present but with different sign!\n", Time); exit(0); }
+        if( el==-lIst[k] ) { throw std::runtime_error("this element already present but with different sign"); }
     }
     
     //ADD ELEMENT TO aRray
@@ -58,8 +58,8 @@ int isItinList(int *lIst, int el){
 int removeELEMENT(int **aRray, int i, int el){
     
     //CRITICAL ERRORS
-    if(i==0) { printf("%g| ERROR: array id=0!\n", Time);   exit(0); }
-    if(el==0){ printf("%g| ERROR: element id=0!\n", Time); exit(0); }
+    if(i==0) { throw std::runtime_error("array id=0"); }
+    if(el==0){ throw std::runtime_error("element id=0"); }
     
     //CHECK ELEMENTS OF aRray AND REMOVE el
     for(int k=1; k<=aRray[i][0]; k++) if( aRray[i][k]==el || aRray[i][k]==-el ) {
@@ -68,7 +68,7 @@ int removeELEMENT(int **aRray, int i, int el){
         return 1;
     }
    // return 1;
-   printf("%g| ERROR: element not found in the array!\n", Time);   exit(0);
+   throw std::runtime_error("element not found in the array");
 }
 //****************************************************************************
 void printARRAY(int **aRray, int i){

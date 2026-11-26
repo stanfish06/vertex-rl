@@ -39,9 +39,9 @@ int EDGE_MERGE(int i)
 {
     
     //******************************************************************************
-    int *vertices; vertices = new int[200]; for(int j=0; j<=199; j++) vertices[j]=0;
-    int *edges; edges = new int[200]; for(int j=0; j<=199; j++) edges[j]=0;
-    int *cells; cells = new int[200]; for(int j=0; j<=199; j++) cells[j]=0;
+    int vertices[200] = {};
+    int edges[200] = {};
+    int cells[200] = {};
     int nrCells=vert_edg_cells_em(i,vertices,edges,cells);
     //******************************************************************************
 
@@ -75,9 +75,6 @@ int EDGE_MERGE(int i)
 
     
     //******************************************************************************
-    delete [] vertices;
-    delete [] edges;
-    delete [] cells;
     //******************************************************************************
     
     
