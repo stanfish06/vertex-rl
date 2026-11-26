@@ -57,27 +57,27 @@ float out_polygons(int fcount){
         
         int srgn=1;
             
-        fprintf(file2, "%d ", srgn*c_vertices[i][0]);
-        fprintf(file3, "%d ", srgn*c_vertices[i][0]);
+        fprintf(file4, "%d ", srgn*c_vertices[i][0]);
+        fprintf(file5, "%d ", srgn*c_vertices[i][0]);
             
         vert_ref_id=c_vertices[i][1];
-        fprintf(file2, "%.16g ", vS[vert_ref_id][1]);
-        fprintf(file3, "%.16g ", vS[vert_ref_id][2]);
+        fprintf(file4, "%.16g ", vS[vert_ref_id][1]);
+        fprintf(file5, "%.16g ", vS[vert_ref_id][2]);
             
         for(int j = 2; j <= c_vertices[i][0]; j++){
             vert_id=c_vertices[i][j];
             //torus_dx_dy_dzS(dxdydz,vert_id,vert_ref_id);
-            fprintf(file2, "%.16g ", vS[vert_id][1]);
-            fprintf(file3, "%.16g ", vS[vert_id][2]);
+            fprintf(file4, "%.16g ", vS[vert_id][1]);
+            fprintf(file5, "%.16g ", vS[vert_id][2]);
         }
             
         for(int j = c_vertices[i][0]; j <= 15; j++){
-            fprintf(file2, "0 ");
-            fprintf(file3, "0 ");
+            fprintf(file4, "0 ");
+            fprintf(file5, "0 ");
         }
             
-        fprintf(file2, "\n");
-        fprintf(file3, "\n");
+        fprintf(file4, "\n");
+        fprintf(file5, "\n");
     }
     fclose(file4);
     fclose(file5);
