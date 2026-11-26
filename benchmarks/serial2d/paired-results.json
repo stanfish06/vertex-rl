@@ -1,0 +1,574 @@
+{
+  "machine": "lima-devflow-task-dda41e3bf92e",
+  "platform": "Linux-7.0.0-15-generic-x86_64-with-glibc2.43",
+  "cpu_affinity": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "full_cpus": 4,
+  "budgets": [
+    1,
+    2,
+    4
+  ],
+  "seed": 646,
+  "duration": 6,
+  "cadence": 0.5,
+  "timeout_seconds": 120.0,
+  "repetitions": 5,
+  "binaries": {
+    "dev": {
+      "path": "/tmp/vertex-phase3-dSXOv6JC/dev-cli",
+      "sha256": "df6cb250dc3664848d15a446b923fe483b13c073f2e3136bb244774e5f8b10a9"
+    },
+    "new": {
+      "path": "/tmp/vertex-phase3-dSXOv6JC/phase3-cli",
+      "sha256": "7870647b6926762399455be3fefde5220504d419eda67534dca1a67e5cc2f405"
+    }
+  },
+  "runs": [
+    {
+      "build": "dev",
+      "threads": 1,
+      "repetition": 1,
+      "directory": "threads-1-pair-1-dev",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 9.338857580005424,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "new",
+      "threads": 1,
+      "repetition": 1,
+      "directory": "threads-1-pair-1-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.5501851180015365,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "new",
+      "threads": 1,
+      "repetition": 2,
+      "directory": "threads-1-pair-2-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.5473674419990857,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "dev",
+      "threads": 1,
+      "repetition": 2,
+      "directory": "threads-1-pair-2-dev",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 9.290949727001134,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "dev",
+      "threads": 1,
+      "repetition": 3,
+      "directory": "threads-1-pair-3-dev",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 9.2585361570018,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "new",
+      "threads": 1,
+      "repetition": 3,
+      "directory": "threads-1-pair-3-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.5404524010009482,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "new",
+      "threads": 1,
+      "repetition": 4,
+      "directory": "threads-1-pair-4-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.5505256010001176,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "dev",
+      "threads": 1,
+      "repetition": 4,
+      "directory": "threads-1-pair-4-dev",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 9.367795533005847,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "dev",
+      "threads": 1,
+      "repetition": 5,
+      "directory": "threads-1-pair-5-dev",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 9.143480241000361,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "new",
+      "threads": 1,
+      "repetition": 5,
+      "directory": "threads-1-pair-5-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.5435400279966416,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "dev",
+      "threads": 2,
+      "repetition": 1,
+      "directory": "threads-2-pair-1-dev",
+      "valid": false,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 10.28944028600381,
+      "first_failing_threshold": 0.0,
+      "errors": [
+        "threshold 0.0: actual time 0.0013116498, reference 0.0106460173, limit 1e-06",
+        "solver logged 23 divisions, reference 22"
+      ],
+      "accepted_centers": 17,
+      "divisions": 23
+    },
+    {
+      "build": "new",
+      "threads": 2,
+      "repetition": 1,
+      "directory": "threads-2-pair-1-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.2145232240000041,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "new",
+      "threads": 2,
+      "repetition": 2,
+      "directory": "threads-2-pair-2-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.2197582680018968,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "dev",
+      "threads": 2,
+      "repetition": 2,
+      "directory": "threads-2-pair-2-dev",
+      "valid": false,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 9.159725238998362,
+      "first_failing_threshold": 0.0,
+      "errors": [
+        "threshold 0.0: actual time 0.00131164992, reference 0.0106460173, limit 1e-06",
+        "solver logged 20 divisions, reference 22"
+      ],
+      "accepted_centers": 17,
+      "divisions": 20
+    },
+    {
+      "build": "dev",
+      "threads": 2,
+      "repetition": 3,
+      "directory": "threads-2-pair-3-dev",
+      "valid": false,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 9.233075778000057,
+      "first_failing_threshold": 0.0,
+      "errors": [
+        "threshold 0.0: actual time 0.0013116498, reference 0.0106460173, limit 1e-06",
+        "solver logged 20 divisions, reference 22"
+      ],
+      "accepted_centers": 17,
+      "divisions": 20
+    },
+    {
+      "build": "new",
+      "threads": 2,
+      "repetition": 3,
+      "directory": "threads-2-pair-3-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.2153551730007166,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "new",
+      "threads": 2,
+      "repetition": 4,
+      "directory": "threads-2-pair-4-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.2160800909987302,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "dev",
+      "threads": 2,
+      "repetition": 4,
+      "directory": "threads-2-pair-4-dev",
+      "valid": false,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 9.280030073998205,
+      "first_failing_threshold": 0.5,
+      "errors": [
+        "threshold 0.5: actual time 0.500305057, reference 0.501726508, limit 1e-06",
+        "solver logged 21 divisions, reference 22"
+      ],
+      "accepted_centers": 17,
+      "divisions": 21
+    },
+    {
+      "build": "dev",
+      "threads": 2,
+      "repetition": 5,
+      "directory": "threads-2-pair-5-dev",
+      "valid": false,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 8.491615993996675,
+      "first_failing_threshold": 0.0,
+      "errors": [
+        "threshold 0.0: actual time 0.00131165027, reference 0.0106460173, limit 1e-06",
+        "solver logged 19 divisions, reference 22"
+      ],
+      "accepted_centers": 17,
+      "divisions": 19
+    },
+    {
+      "build": "new",
+      "threads": 2,
+      "repetition": 5,
+      "directory": "threads-2-pair-5-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.22162645500066,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "dev",
+      "threads": 4,
+      "repetition": 1,
+      "directory": "threads-4-pair-1-dev",
+      "valid": false,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 19.605685167000047,
+      "first_failing_threshold": 0.0,
+      "errors": [
+        "threshold 0.0: actual time 0.0013116491, reference 0.0106460173, limit 1e-06",
+        "solver logged 21 divisions, reference 22"
+      ],
+      "accepted_centers": 17,
+      "divisions": 21
+    },
+    {
+      "build": "new",
+      "threads": 4,
+      "repetition": 1,
+      "directory": "threads-4-pair-1-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.0016696359962225,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "new",
+      "threads": 4,
+      "repetition": 2,
+      "directory": "threads-4-pair-2-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.03868223799509,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "dev",
+      "threads": 4,
+      "repetition": 2,
+      "directory": "threads-4-pair-2-dev",
+      "valid": false,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 17.86609130000579,
+      "first_failing_threshold": 0.0,
+      "errors": [
+        "threshold 0.0: actual time 0.00131165097, reference 0.0106460173, limit 1e-06",
+        "solver logged 18 divisions, reference 22"
+      ],
+      "accepted_centers": 17,
+      "divisions": 18
+    },
+    {
+      "build": "dev",
+      "threads": 4,
+      "repetition": 3,
+      "directory": "threads-4-pair-3-dev",
+      "valid": false,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 17.720229295002355,
+      "first_failing_threshold": 0.0,
+      "errors": [
+        "threshold 0.0: actual time 0.00131164771, reference 0.0106460173, limit 1e-06",
+        "solver logged 18 divisions, reference 22"
+      ],
+      "accepted_centers": 17,
+      "divisions": 18
+    },
+    {
+      "build": "new",
+      "threads": 4,
+      "repetition": 3,
+      "directory": "threads-4-pair-3-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 0.9941342689999146,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "new",
+      "threads": 4,
+      "repetition": 4,
+      "directory": "threads-4-pair-4-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.0062365049961954,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "dev",
+      "threads": 4,
+      "repetition": 4,
+      "directory": "threads-4-pair-4-dev",
+      "valid": false,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 18.078081231004035,
+      "first_failing_threshold": 0.0,
+      "errors": [
+        "threshold 0.0: actual time 0.00131164957, reference 0.0106460173, limit 1e-06",
+        "solver logged 19 divisions, reference 22"
+      ],
+      "accepted_centers": 17,
+      "divisions": 19
+    },
+    {
+      "build": "dev",
+      "threads": 4,
+      "repetition": 5,
+      "directory": "threads-4-pair-5-dev",
+      "valid": false,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 20.20485182599805,
+      "first_failing_threshold": 0.0,
+      "errors": [
+        "threshold 0.0: actual time 0.0013116498, reference 0.0106460173, limit 1e-06"
+      ],
+      "accepted_centers": 17,
+      "divisions": 22
+    },
+    {
+      "build": "new",
+      "threads": 4,
+      "repetition": 5,
+      "directory": "threads-4-pair-5-new",
+      "valid": true,
+      "exit_code": 0,
+      "launch_to_exit_seconds": 1.0295369750019745,
+      "first_failing_threshold": null,
+      "errors": [],
+      "maximum_errors": {
+        "actual_time": 0.0,
+        "area": 0.0,
+        "vertex_displacement": 0.0
+      },
+      "accepted_centers": 17,
+      "divisions": 22
+    }
+  ],
+  "complete": true,
+  "active_run": null,
+  "metrics": {
+    "1": {
+      "dev_median_seconds": 9.290949727001134,
+      "new_median_seconds": 1.5473674419990857,
+      "dev_over_new": 6.004359064837183,
+      "new_serial_over_new": 1.0
+    },
+    "2": {
+      "dev_median_seconds": null,
+      "new_median_seconds": 1.2160800909987302,
+      "dev_over_new": null,
+      "new_serial_over_new": 1.2724223128497065
+    },
+    "4": {
+      "dev_median_seconds": null,
+      "new_median_seconds": 1.0062365049961954,
+      "dev_over_new": null,
+      "new_serial_over_new": 1.537777087509796
+    }
+  }
+}
