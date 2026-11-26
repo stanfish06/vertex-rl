@@ -72,6 +72,39 @@ class Solver3DTests(unittest.TestCase):
         self.assertAlmostEqual(first["cells"][0]["target_volume"],1.02)
         self.assertAlmostEqual(second["cells"][0]["target_volume"],1.04)
 
+    def test_oblique_cut_after_growth(self):
+        # The initial growing step displaces original face diagonals slightly.
+        # This cut once produced a sliver cap that folded after 0.00001 time units.
+        self.cube["zones"]=[{"id":0,"rule":{"kind":"all"},"growth_rate":0.1}]
+        reset=dict(op="reset",mode="cell",seed=646,time_limit=0.06,experiment=self.cube)
+        grow=dict(op="step",deadline=0.02,actions=[{"id":1,"action":"grow"}])
+        normal=[-0.875118813189268,0.8795262092725091,0.20379162303611742]
+        divide=dict(op="step",deadline=0.04,actions=[{"id":1,"action":"divide","orientation":normal}])
+        _, initial, growing, cut = self.replies(self.cube,reset,grow,divide)
+        self.assertEqual(cut["status"],"ok",cut.get("message"))
+        self.assertEqual(cut["time"],0.04)
+        self.assertEqual([c["id"] for c in cut["cells"]],[2,3])
+        self.assertTrue(all(c["volume"]>0 and c["age"]==0.02 for c in cut["cells"]))
+
+    def test_nearly_parallel_edges_meeting_at_a_shared_vertex(self):
+        self.cube["zones"] = [dict(id=0,rule={"kind":"all"},allow_death=True,growth_rate=.1)]
+        reset = dict(op="reset",mode="cell",seed=646,time_limit=.06,experiment=self.cube)
+        def divide(cell, orientation):
+            return dict(id=cell,action="divide",orientation=orientation)
+        # Three oblique cuts create a pair of triangles meeting only at one vertex.
+        # Their almost-parallel incident edges previously looked self-intersecting.
+        first = [divide(1,[-.4122475868291855,.2449202968048192,.917494816939634])]
+        second = [divide(2,[.8825508697563609,-.3925303533235496,-.7840117632360368]),
+                  dict(id=3,action="grow")]
+        third = [dict(id=3,action="grow"),dict(id=4,action="die"),
+                 divide(5,[.020191522650952365,.9006514896470097,-.576431134205794])]
+        steps = [dict(op="step",deadline=t,actions=a) for t,a in zip((.02,.04,.06),(first,second,third))]
+        replies = self.replies(self.cube,reset,*steps)
+        last = replies[-1]
+        self.assertEqual(last["status"],"truncated",last.get("message"))
+        self.assertEqual(last["time"],.06)
+        self.assertEqual([c["id"] for c in last["cells"]],[3,6,7])
+
     def test_cube_collection(self):
         output = self.directory / "frames"
         subprocess.run([self.binary, "run", CUBE, output, "--threads", "2"], check=True, capture_output=True)
